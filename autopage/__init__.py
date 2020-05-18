@@ -27,8 +27,10 @@ __all__ = ['AutoPager']
 
 
 @contextlib.contextmanager
-def AutoPager(output_stream):
+def AutoPager(output_stream, line_buffer=False):
     if not output_stream.isatty():
+        if line_buffer:
+            output_stream.reconfigure(line_buffering=line_buffer)
         yield output_stream
         return
 
@@ -36,6 +38,7 @@ def AutoPager(output_stream):
                              stdin=subprocess.PIPE)
     try:
         with io.TextIOWrapper(pager.stdin,
+                              line_buffering=line_buffer,
                               errors='backslashreplace') as stream:
             try:
                 yield stream
