@@ -28,6 +28,12 @@ __all__ = ['AutoPager']
 
 @contextlib.contextmanager
 def AutoPager(output_stream, line_buffer=False):
+    """
+    A context manager that launches a pager for the output if appropriate.
+
+    If the output stream is not to the console (i.e. it is piped or
+    redirected), no pager will be launched.
+    """
     if not output_stream.isatty():
         if line_buffer:
             output_stream.reconfigure(line_buffering=line_buffer)
