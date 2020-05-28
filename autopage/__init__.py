@@ -52,10 +52,11 @@ def AutoPager(output_stream, line_buffer=False):
                 pass
     except OSError:
         pass
-    while True:
-        try:
-            pager.wait()
-            break
-        except KeyboardInterrupt:
-            # Pager ignores Ctrl-C, so we should too
-            pass
+    finally:
+        while True:
+            try:
+                pager.wait()
+                break
+            except KeyboardInterrupt:
+                # Pager ignores Ctrl-C, so we should too
+                pass
