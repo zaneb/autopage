@@ -40,7 +40,7 @@ def AutoPager(output_stream, line_buffer=False):
         yield output_stream
         return
 
-    pager = subprocess.Popen(['less', '-R'],
+    pager = subprocess.Popen(['less', '-R', '-F'],
                              stdin=subprocess.PIPE)
     try:
         with io.TextIOWrapper(pager.stdin,
