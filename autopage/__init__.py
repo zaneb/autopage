@@ -69,7 +69,10 @@ def AutoPager(output_stream=None, line_buffer=False):
 
     streams = {} if use_stdout else {'stdout': output_stream}
     streams['stdin'] = subprocess.PIPE
-    pager = subprocess.Popen(['less', '-R', '-F'], **streams)
+    args = ['--RAW-CONTROL-CHARS']  # Enable colour output
+    if not line_buffer:
+        args.append('--quit-if-one-screen')
+    pager = subprocess.Popen(['less'] + args, **streams)
     try:
         with io.TextIOWrapper(pager.stdin,
                               line_buffering=line_buffer,
