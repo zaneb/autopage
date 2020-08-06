@@ -73,10 +73,7 @@ def AutoPager(output_stream=None, line_buffer=False):
         with io.TextIOWrapper(pager.stdin,
                               line_buffering=line_buffer,
                               errors='backslashreplace') as stream:
-            try:
-                yield stream
-            except KeyboardInterrupt:
-                pass
+            yield stream
     except OSError:
         pass
     finally:
