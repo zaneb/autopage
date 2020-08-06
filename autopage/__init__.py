@@ -21,22 +21,49 @@ By Zane Bitter.
 import contextlib
 import io
 import subprocess
+import sys
 
 
 __all__ = ['AutoPager']
 
 
 @contextlib.contextmanager
-def AutoPager(output_stream, line_buffer=False):
+def AutoPager(output_stream=None, line_buffer=False):
     """
     A context manager that launches a pager for the output if appropriate.
 
     If the output stream is not to the console (i.e. it is piped or
     redirected), no pager will be launched.
     """
+    use_stdout = output_stream is None
+    if use_stdout:
+        output_stream = sys.stdout
+
     if not output_stream.isatty():
         if line_buffer:
-            output_stream.reconfigure(line_buffering=line_buffer)
+            # Python 3.7 & later
+            if hasattr(output_stream, 'reconfigure'):
+                output_stream.reconfigure(line_buffering=line_buffer)
+            else:
+                # Pure-python I/O
+                if hasattr(output_stream, '_line_buffering'):
+                    output_stream._line_buffering = line_buffer
+                    output_stream.flush()
+                # Native I/O on Python 3.6
+                elif (isinstance(output_stream, io.TextIOWrapper) and
+                        not output_stream.line_buffering):
+                    args = {
+                        'encoding': output_stream.encoding,
+                        'errors': output_stream.errors,
+                    }
+                    if use_stdout:
+                        sys.stdout = None
+                    newstream = io.TextIOWrapper(output_stream.detach(),
+                                                 line_buffering=line_buffer,
+                                                 **args)
+                    output_stream = newstream
+                    if use_stdout:
+                        sys.stdout = newstream
         yield output_stream
         return
 
