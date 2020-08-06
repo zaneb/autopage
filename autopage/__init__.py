@@ -72,11 +72,12 @@ def AutoPager(output_stream=None, line_buffer=False):
     args = ['--RAW-CONTROL-CHARS']  # Enable colour output
     if not line_buffer:
         args.append('--quit-if-one-screen')
-    pager = subprocess.Popen(['less'] + args, **streams)
+    pager = subprocess.Popen(['less'] + args,
+                             bufsize=1 if line_buffer else -1,
+                             errors='backslashreplace',
+                             **streams)
     try:
-        with io.TextIOWrapper(pager.stdin,
-                              line_buffering=line_buffer,
-                              errors='backslashreplace') as stream:
+        with contextlib.closing(pager.stdin) as stream:
             yield stream
     except OSError:
         pass
