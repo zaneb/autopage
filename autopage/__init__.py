@@ -41,10 +41,12 @@ class AutoPager:
 
     def __init__(self,
                  output_stream: Optional[TextIO] = None, *,
+                 allow_color: bool = True,
                  line_buffering: bool = False):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = self._out.isatty()
+        self._color = allow_color
         self._line_buffering = line_buffering
         self._pager: Optional[subprocess.Popen] = None
         self._exit_code = 0
@@ -91,7 +93,9 @@ class AutoPager:
                         sys.stdout = newstream
 
     def _paged_stream(self) -> TextIO:
-        args = ['--RAW-CONTROL-CHARS']  # Enable colour output
+        args = []
+        if self._color:
+            args.append('--RAW-CONTROL-CHARS')
         if not self._line_buffering:
             args.append('--quit-if-one-screen')
         buffer_size = 1 if self._line_buffering else -1
