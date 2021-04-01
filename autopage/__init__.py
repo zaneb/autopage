@@ -26,6 +26,7 @@ import types
 import typing
 from typing import Any, Optional, Type, TextIO
 
+_SIGNAL_EXIT_BASE = 128
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
 
@@ -46,6 +47,7 @@ class AutoPager:
         self._tty = self._out.isatty()
         self._line_buffering = line_buffering
         self._pager: Optional[subprocess.Popen] = None
+        self._exit_code = 0
 
     def to_terminal(self) -> bool:
         """Return whether the output stream is a terminal."""
@@ -133,11 +135,31 @@ class AutoPager:
 
         if exc is not None:
             if isinstance(exc, BrokenPipeError):
+                # Exit code for SIGPIPE
+                self._exit_code = _SIGNAL_EXIT_BASE + 13
                 # Suppress exceptions caused by a broken pipe (indicating that
                 # the user has exited the pager
                 if self._pager is not None:
                     return True
+            elif isinstance(exc, KeyboardInterrupt):
+                # Exit code for SIGINT
+                self._exit_code = _SIGNAL_EXIT_BASE + 2
+            elif isinstance(exc, SystemExit):
+                self._exit_code = exc.code
+            else:
+                self._exit_code = 1
         return False
+
+    def exit_code(self) -> int:
+        """
+        Return an appropriate exit code for the process based on any errors.
+
+        If the user exits the program prematurely by closing the pager, we may
+        want to return a different exit code for the process. This method
+        returns an appropriate exit code on the basis of the existence and type
+        of any uncaught exceptions.
+        """
+        return self._exit_code
 
 
 def line_buffer_from_input(input_stream: Optional[typing.IO] = None) -> bool:
