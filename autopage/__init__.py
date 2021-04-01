@@ -116,6 +116,12 @@ class AutoPager:
                  exc: Optional[BaseException],
                  traceback: Optional[types.TracebackType]) -> bool:
         if self._pager is not None:
+            try:
+                typing.cast(TextIO, self._pager.stdin).close()
+            except BrokenPipeError:
+                # Stream already closed
+                pass
+            # Wait for user to exit pager
             while True:
                 try:
                     self._pager.wait()
