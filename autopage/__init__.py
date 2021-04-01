@@ -40,7 +40,7 @@ class AutoPager:
     """
 
     def __init__(self,
-                 output_stream: Optional[TextIO] = None,
+                 output_stream: Optional[TextIO] = None, *,
                  line_buffering: bool = False):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
