@@ -22,6 +22,10 @@ import io
 import subprocess
 import sys
 
+import types
+import typing
+from typing import Any, Optional, Type, TextIO
+
 
 __all__ = ['AutoPager']
 
@@ -34,13 +38,15 @@ class AutoPager:
     redirected), no pager will be launched.
     """
 
-    def __init__(self, output_stream=None, line_buffering=False):
+    def __init__(self,
+                 output_stream: Optional[TextIO] = None,
+                 line_buffering: bool = False):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._line_buffering = line_buffering
-        self._pager = None
+        self._pager: Optional[subprocess.Popen] = None
 
-    def __enter__(self):
+    def __enter__(self) -> TextIO:
         # Only invoke the pager if the output is going to a tty; if it is
         # being sent to a file or pipe then we don't want the pager involved
         if self._out.isatty():
@@ -49,45 +55,53 @@ class AutoPager:
             self._reconfigure_output_stream()
             return self._out
 
-    def _reconfigure_output_stream(self):
+    def _reconfigure_output_stream(self) -> None:
+        out = typing.cast(io.TextIOWrapper, self._out)
         if self._line_buffering:
             # Python 3.7 & later
-            if hasattr(self._out, 'reconfigure'):
-                self._out.reconfigure(line_buffering=self._line_buffering)
+            if hasattr(out, 'reconfigure'):
+                out.reconfigure(line_buffering=self._line_buffering)
             else:
                 # Pure-python I/O
-                if hasattr(self._out, '_line_buffering'):
-                    self._out._line_buffering = self._line_buffering
-                    self._out.flush()
+                if hasattr(out, '_line_buffering'):
+                    typing.cast(Any,
+                                out)._line_buffering = self._line_buffering
+                    out.flush()
                 # Native I/O on Python 3.6
-                elif (isinstance(self._out, io.TextIOWrapper) and
-                        not self._out.line_buffering):
-                    args = {
-                        'encoding': self._out.encoding,
-                        'errors': self._out.errors,
-                        'line_buffering': self._line_buffering,
-                    }
+                elif (isinstance(out, io.TextIOWrapper) and
+                        not out.line_buffering):
+                    encoding = out.encoding
+                    errors = out.errors
                     if self._use_stdout:
-                        sys.stdout = None
-                    newstream = io.TextIOWrapper(self._out.detach(), **args)
+                        sys.stdout = typing.cast(TextIO, None)
+                    newstream = io.TextIOWrapper(
+                        out.detach(),
+                        line_buffering=self._line_buffering,
+                        encoding=encoding,
+                        errors=errors)
                     self._out = newstream
                     if self._use_stdout:
                         sys.stdout = newstream
 
-    def _paged_stream(self):
-        streams = {} if self._use_stdout else {'stdout': self._out}
-        streams['stdin'] = subprocess.PIPE
+    def _paged_stream(self) -> TextIO:
         args = ['--RAW-CONTROL-CHARS']  # Enable colour output
         if not self._line_buffering:
             args.append('--quit-if-one-screen')
         buffer_size = 1 if self._line_buffering else -1
+        out_stream = None if self._use_stdout else self._out
         self._pager = subprocess.Popen(['less'] + args,
                                        bufsize=buffer_size,
+                                       universal_newlines=True,
                                        errors='backslashreplace',
-                                       **streams)
-        return self._pager.stdin
+                                       stdin=subprocess.PIPE,
+                                       stdout=out_stream)
+        assert self._pager.stdin is not None
+        return typing.cast(TextIO, self._pager.stdin)
 
-    def __exit__(self, exc_type, exc, traceback):
+    def __exit__(self,
+                 exc_type: Optional[Type[BaseException]],
+                 exc: Optional[BaseException],
+                 traceback: Optional[types.TracebackType]) -> bool:
         if self._pager is not None:
             while True:
                 try:
