@@ -43,13 +43,18 @@ class AutoPager:
                  line_buffering: bool = False):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
+        self._tty = self._out.isatty()
         self._line_buffering = line_buffering
         self._pager: Optional[subprocess.Popen] = None
+
+    def to_terminal(self) -> bool:
+        """Return whether the output stream is a terminal."""
+        return self._tty
 
     def __enter__(self) -> TextIO:
         # Only invoke the pager if the output is going to a tty; if it is
         # being sent to a file or pipe then we don't want the pager involved
-        if self._out.isatty():
+        if self.to_terminal():
             return self._paged_stream()
         else:
             self._reconfigure_output_stream()
