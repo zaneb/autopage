@@ -132,8 +132,11 @@ class AutoPager:
                     break
 
         if exc is not None:
-            if isinstance(exc, OSError):
-                return True
+            if isinstance(exc, BrokenPipeError):
+                # Suppress exceptions caused by a broken pipe (indicating that
+                # the user has exited the pager
+                if self._pager is not None:
+                    return True
         return False
 
 
