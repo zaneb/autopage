@@ -93,7 +93,15 @@ class AutoPager:
         if not self._line_buffering:
             args.append('--quit-if-one-screen')
         buffer_size = 1 if self._line_buffering else -1
-        out_stream = None if self._use_stdout else self._out
+        out_stream: Optional[TextIO] = None
+        if not self._use_stdout:
+            try:
+                # Ensure the output stream has a file descriptor
+                self._out.fileno()
+            except OSError:
+                pass
+            else:
+                out_stream = self._out
         self._pager = subprocess.Popen(['less'] + args,
                                        bufsize=buffer_size,
                                        universal_newlines=True,
