@@ -69,6 +69,9 @@ class AutoPager:
             return getattr(self._out, 'line_buffering', False)
         return self._set_line_buffering
 
+    def _encoding(self) -> str:
+        return getattr(self._out, 'encoding', 'ascii')
+
     def _reconfigure_output_stream(self) -> None:
         if self._set_line_buffering is None:
             return
@@ -89,7 +92,7 @@ class AutoPager:
                 out.flush()
             # Native C I/O
             else:
-                encoding = out.encoding
+                encoding = self._encoding()
                 errors = out.errors
                 line_buffering = self._line_buffering()
                 try:
@@ -124,6 +127,7 @@ class AutoPager:
         self._pager = subprocess.Popen(['less'] + args,
                                        bufsize=buffer_size,
                                        universal_newlines=True,
+                                       encoding=self._encoding(),
                                        errors='backslashreplace',
                                        stdin=subprocess.PIPE,
                                        stdout=out_stream)
