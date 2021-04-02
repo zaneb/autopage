@@ -20,12 +20,13 @@ By Zane Bitter.
 
 import enum
 import io
+import os
 import subprocess
 import sys
 
 import types
 import typing
-from typing import Any, Optional, Type, TextIO
+from typing import Any, Optional, Type, Union, Dict, List, TextIO
 
 
 _SIGNAL_EXIT_BASE = 128
@@ -133,12 +134,31 @@ class AutoPager:
                     if self._use_stdout:
                         sys.stdout = newstream
 
-    def _paged_stream(self) -> TextIO:
-        args = []
+    def _pager_cmd(self) -> Union[List[str], str]:
+        return ['less']
+
+    def _pager_env(self) -> Optional[Dict[str, str]]:
+        less_flags = []
         if self._color:
-            args.append('--RAW-CONTROL-CHARS')
+            # This option will cause less to output ANSI color escape sequences
+            # in raw form.
+            # Equivalent to the --RAW-CONTROL-CHARS argument
+            less_flags.append('R')
         if not self._line_buffering():
-            args.append('--quit-if-one-screen')
+            # This option will cause less to buffer until an entire screen's
+            # worth of data is available (or the EOF is reached), so don't
+            # enable it when line buffering is requested.
+            # Equivalent to the --quit-if-one-screen argument
+            less_flags.append('F')
+
+        if not (less_flags and (os.getenv('LESS') is None)):
+            return None
+
+        env = dict(os.environ)
+        env['LESS'] = ''.join(less_flags)
+        return env
+
+    def _paged_stream(self) -> TextIO:
         buffer_size = 1 if self._line_buffering() else -1
         out_stream: Optional[TextIO] = None
         if not self._use_stdout:
@@ -149,7 +169,8 @@ class AutoPager:
                 pass
             else:
                 out_stream = self._out
-        self._pager = subprocess.Popen(['less'] + args,
+        self._pager = subprocess.Popen(self._pager_cmd(),
+                                       env=self._pager_env(),
                                        bufsize=buffer_size,
                                        universal_newlines=True,
                                        encoding=self._encoding(),
