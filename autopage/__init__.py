@@ -42,12 +42,12 @@ class AutoPager:
     def __init__(self,
                  output_stream: Optional[TextIO] = None, *,
                  allow_color: bool = True,
-                 line_buffering: bool = False):
+                 line_buffering: Optional[bool] = None):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = self._out.isatty()
         self._color = allow_color
-        self._line_buffering = line_buffering
+        self._set_line_buffering = line_buffering
         self._pager: Optional[subprocess.Popen] = None
         self._exit_code = 0
 
@@ -64,31 +64,44 @@ class AutoPager:
             self._reconfigure_output_stream()
             return self._out
 
+    def _line_buffering(self) -> bool:
+        if self._set_line_buffering is None:
+            return getattr(self._out, 'line_buffering', False)
+        return self._set_line_buffering
+
     def _reconfigure_output_stream(self) -> None:
+        if self._set_line_buffering is None:
+            return
+
+        if not isinstance(self._out, io.TextIOWrapper):
+            return
         out = typing.cast(io.TextIOWrapper, self._out)
-        if self._line_buffering:
-            # Python 3.7 & later
-            if hasattr(out, 'reconfigure'):
-                out.reconfigure(line_buffering=self._line_buffering)
+
+        # Python 3.7 & later
+        if hasattr(out, 'reconfigure'):
+            out.reconfigure(line_buffering=self._set_line_buffering)
+        # Python 3.6
+        elif (self._out.line_buffering != self._line_buffering()):
+            # Pure-python I/O
+            if hasattr(out, '_line_buffering'):
+                typing.cast(Any,
+                            out)._line_buffering = self._line_buffering()
+                out.flush()
+            # Native C I/O
             else:
-                # Pure-python I/O
-                if hasattr(out, '_line_buffering'):
-                    typing.cast(Any,
-                                out)._line_buffering = self._line_buffering
-                    out.flush()
-                # Native I/O on Python 3.6
-                elif (isinstance(out, io.TextIOWrapper) and
-                        not out.line_buffering):
-                    encoding = out.encoding
-                    errors = out.errors
+                encoding = out.encoding
+                errors = out.errors
+                line_buffering = self._line_buffering()
+                try:
                     if self._use_stdout:
                         sys.stdout = typing.cast(TextIO, None)
                     newstream = io.TextIOWrapper(
                         out.detach(),
-                        line_buffering=self._line_buffering,
+                        line_buffering=line_buffering,
                         encoding=encoding,
                         errors=errors)
                     self._out = newstream
+                finally:
                     if self._use_stdout:
                         sys.stdout = newstream
 
@@ -96,9 +109,9 @@ class AutoPager:
         args = []
         if self._color:
             args.append('--RAW-CONTROL-CHARS')
-        if not self._line_buffering:
+        if not self._line_buffering():
             args.append('--quit-if-one-screen')
-        buffer_size = 1 if self._line_buffering else -1
+        buffer_size = 1 if self._line_buffering() else -1
         out_stream: Optional[TextIO] = None
         if not self._use_stdout:
             try:
