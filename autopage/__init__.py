@@ -18,6 +18,7 @@ A library to provide automatic paging for console output.
 By Zane Bitter.
 """
 
+import enum
 import io
 import subprocess
 import sys
@@ -26,9 +27,22 @@ import types
 import typing
 from typing import Any, Optional, Type, TextIO
 
+
 _SIGNAL_EXIT_BASE = 128
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
+
+
+class ErrorStrategy(enum.Enum):
+    """
+    The strategy for dealing with unicode errors when convering text to bytes.
+    """
+    STRICT = 'strict'
+    IGNORE = 'ignore'
+    REPLACE = 'replace'
+    BACKSLASH_REPLACE = 'backslashreplace'
+    XML_CHARREF_REPLACE = 'xmlcharrefreplace'
+    NAME_REPLACE = 'namereplace'
 
 
 class AutoPager:
@@ -42,12 +56,14 @@ class AutoPager:
     def __init__(self,
                  output_stream: Optional[TextIO] = None, *,
                  allow_color: bool = True,
-                 line_buffering: Optional[bool] = None):
+                 line_buffering: Optional[bool] = None,
+                 errors: Optional[ErrorStrategy] = None):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = self._out.isatty()
         self._color = allow_color
         self._set_line_buffering = line_buffering
+        self._set_errors = typing.cast(Optional[str], errors)
         self._pager: Optional[subprocess.Popen] = None
         self._exit_code = 0
 
@@ -72,8 +88,13 @@ class AutoPager:
     def _encoding(self) -> str:
         return getattr(self._out, 'encoding', 'ascii')
 
+    def _errors(self) -> str:
+        if self._set_errors is None:
+            return getattr(self._out, 'errors', ErrorStrategy.STRICT)
+        return self._set_errors
+
     def _reconfigure_output_stream(self) -> None:
-        if self._set_line_buffering is None:
+        if self._set_line_buffering is None and self._set_errors is None:
             return
 
         if not isinstance(self._out, io.TextIOWrapper):
@@ -82,18 +103,22 @@ class AutoPager:
 
         # Python 3.7 & later
         if hasattr(out, 'reconfigure'):
-            out.reconfigure(line_buffering=self._set_line_buffering)
+            out.reconfigure(line_buffering=self._set_line_buffering,
+                            errors=self._set_errors)
         # Python 3.6
-        elif (self._out.line_buffering != self._line_buffering()):
+        elif (self._out.line_buffering != self._line_buffering()
+                or self._out.errors != self._errors()):
             # Pure-python I/O
-            if hasattr(out, '_line_buffering'):
-                typing.cast(Any,
-                            out)._line_buffering = self._line_buffering()
-                out.flush()
+            if (hasattr(out, '_line_buffering')
+                    and hasattr(out, '_errors')):
+                py_out = typing.cast(Any, out)
+                py_out._line_buffering = self._line_buffering()
+                py_out._errors = self._errors()
+                py_out.flush()
             # Native C I/O
             else:
                 encoding = self._encoding()
-                errors = out.errors
+                errors = self._errors()
                 line_buffering = self._line_buffering()
                 try:
                     if self._use_stdout:
@@ -128,7 +153,7 @@ class AutoPager:
                                        bufsize=buffer_size,
                                        universal_newlines=True,
                                        encoding=self._encoding(),
-                                       errors='backslashreplace',
+                                       errors=self._errors(),
                                        stdin=subprocess.PIPE,
                                        stdout=out_stream)
         assert self._pager.stdin is not None
