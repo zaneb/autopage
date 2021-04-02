@@ -135,7 +135,8 @@ class AutoPager:
                         sys.stdout = newstream
 
     def _pager_cmd(self) -> Union[List[str], str]:
-        return ['less']
+        pager = os.getenv('PAGER')
+        return ['less'] if pager is None else pager
 
     def _pager_env(self) -> Optional[Dict[str, str]]:
         less_flags = []
