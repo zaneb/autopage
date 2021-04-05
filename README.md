@@ -19,6 +19,14 @@ programs can.
 Open Source licensed under the terms of the Apache Software License, version
 2.0.
 
+## Installation
+
+[Autopage is available from PyPI](https://pypi.org/project/autopage/). The
+easiest way to install (preferably in a `virtualenv` virtual environment) is
+with `pip`:
+
+    $ pip install autopage
+
 ## Basic Use
 
 The `AutoPager` class provides a context manager that furnishes the output
