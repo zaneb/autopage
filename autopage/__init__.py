@@ -64,7 +64,7 @@ class AutoPager:
         self._tty = self._out.isatty()
         self._color = allow_color
         self._set_line_buffering = line_buffering
-        self._set_errors = typing.cast(Optional[str], errors)
+        self._set_errors = errors
         self._pager: Optional[subprocess.Popen] = None
         self._exit_code = 0
 
@@ -105,7 +105,9 @@ class AutoPager:
         # Python 3.7 & later
         if hasattr(out, 'reconfigure'):
             out.reconfigure(line_buffering=self._set_line_buffering,
-                            errors=self._set_errors)
+                            errors=(str(self._set_errors)
+                                    if self._set_errors is not None
+                                    else None))
         # Python 3.6
         elif (self._out.line_buffering != self._line_buffering()
                 or self._out.errors != self._errors()):
