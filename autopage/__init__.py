@@ -91,8 +91,8 @@ class AutoPager:
 
     def _errors(self) -> str:
         if self._set_errors is None:
-            return getattr(self._out, 'errors', ErrorStrategy.STRICT)
-        return self._set_errors
+            return getattr(self._out, 'errors', str(ErrorStrategy.STRICT))
+        return str(self._set_errors)
 
     def _reconfigure_output_stream(self) -> None:
         if self._set_line_buffering is None and self._set_errors is None:
