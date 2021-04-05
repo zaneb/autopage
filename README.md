@@ -25,7 +25,7 @@ The `AutoPager` class provides a context manager that furnishes the output
 stream to write to. Here is a basic example that reads from stdin and outputs
 to a pager connected to stdout:
 
-```
+```python
 import sys
 import autopage
 
@@ -72,7 +72,7 @@ and optionally processing the data before outputting it again, the convenience
 function `line_buffer_from_input()` returns the optimal line buffering setting
 for a given input stream (`sys.stdin` by default).
 
-```
+```python
 import sys
 import autopage
 
@@ -92,7 +92,7 @@ exceptions that bubble up through the context manager.
 
 ## Complete Example
 
-```
+```python
 import sys
 import autopage
 
