@@ -117,7 +117,7 @@ def process(input_stream, output_stream):
             for l in input_stream:
                 out.write(l)
     except Exception as exc:
-        sys.stderr.write(f'{stf(exc)}\n')
+        sys.stderr.write(f'{str(exc)}\n')
     except KeyboardInterrupt:
         pass
     return pager.exit_code()
