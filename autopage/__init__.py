@@ -191,7 +191,7 @@ class AutoPager:
             try:
                 typing.cast(TextIO, self._pager.stdin).close()
             except BrokenPipeError:
-                # Stream already closed
+                # Other end of pipe already closed
                 pass
             # Wait for user to exit pager
             while True:
@@ -202,15 +202,27 @@ class AutoPager:
                     continue
                 else:
                     break
+        else:
+            try:
+                if not self._out.closed:
+                    self._out.flush()
+            except BrokenPipeError:
+                try:
+                    # Other end of pipe already closed, so close the stream now
+                    # and handle the error.
+                    self._out.close()
+                except BrokenPipeError:
+                    # This will always happen
+                    pass
 
         if exc is not None:
             if isinstance(exc, BrokenPipeError):
                 # Exit code for SIGPIPE
                 self._exit_code = _SIGNAL_EXIT_BASE + 13
                 # Suppress exceptions caused by a broken pipe (indicating that
-                # the user has exited the pager
-                if self._pager is not None:
-                    return True
+                # the user has exited the pager, or the following process in
+                # the pipeline has exited)
+                return True
             elif isinstance(exc, KeyboardInterrupt):
                 # Exit code for SIGINT
                 self._exit_code = _SIGNAL_EXIT_BASE + 2
