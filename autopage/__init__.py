@@ -134,7 +134,7 @@ class AutoPager:
                     self._out = newstream
                 finally:
                     if self._use_stdout:
-                        sys.stdout = newstream
+                        sys.stdout = self._out
 
     def _pager_cmd(self) -> Union[List[str], str]:
         pager = os.getenv('PAGER')
