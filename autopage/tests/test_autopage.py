@@ -12,6 +12,8 @@
 
 import unittest
 
+import fixtures
+
 from autopage.tests import sinks
 
 import autopage
@@ -19,16 +21,16 @@ import autopage
 
 class ToTerminalTest(unittest.TestCase):
     def test_pty(self):
-        with sinks.tty() as out:
-            p = autopage.AutoPager(out)
-            self.assertTrue(p.to_terminal())
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            self.assertTrue(ap.to_terminal())
 
     def test_stringio(self):
-        with sinks.buffer() as out:
-            p = autopage.AutoPager(out)
-            self.assertFalse(p.to_terminal())
+        with sinks.BufferFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            self.assertFalse(ap.to_terminal())
 
     def test_file(self):
-        with sinks.temp() as out:
-            p = autopage.AutoPager(out)
-            self.assertFalse(p.to_terminal())
+        with sinks.TempFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            self.assertFalse(ap.to_terminal())

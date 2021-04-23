@@ -10,30 +10,29 @@
 #   License for the specific language governing permissions and limitations
 #   under the License.
 
-import contextlib
 import io
 import os
 import pty
 import tempfile
 
-
-@contextlib.contextmanager
-def tty():
-    k, term = pty.openpty()
-    try:
-        with os.fdopen(term, 'w') as stream:
-            yield stream
-    finally:
-        os.close(k)
+import fixtures
 
 
-@contextlib.contextmanager
-def temp():
-    with tempfile.TemporaryFile('w') as temp:
-        yield temp
+class TTYFixture(fixtures.Fixture):
+    def _setUp(self):
+        self._k, term = pty.openpty()
+        self.stream = os.fdopen(term, 'w')
+        self.addCleanup(self.stream.close)
+        self.addCleanup(os.close, self._k)
 
 
-@contextlib.contextmanager
-def buffer():
-    with contextlib.closing(io.StringIO()) as buf:
-        yield buf
+class TempFixture(fixtures.Fixture):
+    def _setUp(self):
+        self.stream = tempfile.TemporaryFile('w')
+        self.addCleanup(self.stream.close)
+
+
+class BufferFixture(fixtures.Fixture):
+    def _setUp(self):
+        self.stream = io.StringIO()
+        self.addCleanup(self.stream.close)
