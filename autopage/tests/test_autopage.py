@@ -34,3 +34,58 @@ class ToTerminalTest(unittest.TestCase):
         with sinks.TempFixture() as out:
             ap = autopage.AutoPager(out.stream)
             self.assertFalse(ap.to_terminal())
+
+
+class ExitCodeTest(fixtures.TestWithFixtures):
+    def setUp(self):
+        out = sinks.BufferFixture()
+        self.useFixture(out)
+        self.ap = autopage.AutoPager(out.stream)
+
+    def test_success(self):
+        with self.ap:
+            pass
+        self.assertEqual(0, self.ap.exit_code())
+
+    def test_broken_pipe(self):
+        with self.ap:
+            raise BrokenPipeError
+        self.assertEqual(141, self.ap.exit_code())
+
+    def test_exception(self):
+        class MyException(Exception):
+            pass
+
+        def run():
+            with self.ap:
+                raise MyException
+
+        self.assertRaises(MyException, run)
+        self.assertEqual(1, self.ap.exit_code())
+
+    def test_base_exception(self):
+        class MyBaseException(BaseException):
+            pass
+
+        def run():
+            with self.ap:
+                raise MyBaseException
+
+        self.assertRaises(MyBaseException, run)
+        self.assertEqual(1, self.ap.exit_code())
+
+    def test_interrupt(self):
+        def run():
+            with self.ap:
+                raise KeyboardInterrupt
+
+        self.assertRaises(KeyboardInterrupt, run)
+        self.assertEqual(130, self.ap.exit_code())
+
+    def test_system_exit(self):
+        def run():
+            with self.ap:
+                raise SystemExit(42)
+
+        self.assertRaises(SystemExit, run)
+        self.assertEqual(42, self.ap.exit_code())
