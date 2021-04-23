@@ -187,6 +187,23 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.assertEqual('namereplace', ap._errors())
         self.assertEqual(self.default_lb, ap._line_buffering())
 
+    def test_errors_string(self):
+        ap = autopage.AutoPager(self.stream,
+                                errors='namereplace')
+        ap._reconfigure_output_stream()
+        self.addCleanup(ap._out.close)
+        self.assertEqual(self.default_lb, ap._out.line_buffering)
+        self.assertEqual('namereplace', ap._out.errors)
+        self.assertNotEqual(self.default_errors, ap._out.errors)
+        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual('namereplace', ap._errors())
+        self.assertEqual(self.default_lb, ap._line_buffering())
+
+    def test_errors_bogus_string(self):
+        self.assertRaises(ValueError,
+                          autopage.AutoPager,
+                          self.stream, errors='panic')
+
     def test_line_buffering_on_errors(self):
         ap = autopage.AutoPager(self.stream,
                                 line_buffering=True,

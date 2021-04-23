@@ -64,7 +64,8 @@ class AutoPager:
         self._tty = self._out.isatty()
         self._color = allow_color
         self._set_line_buffering = line_buffering
-        self._set_errors = errors
+        self._set_errors = (ErrorStrategy(errors) if errors is not None
+                            else None)
         self._pager: Optional[subprocess.Popen] = None
         self._exit_code = 0
 
