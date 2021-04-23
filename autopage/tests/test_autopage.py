@@ -175,7 +175,6 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
             self.assertEqual(self.default_errors, sys.stdout.errors)
             self.assertEqual(self.encoding, sys.stdout.encoding)
 
-    @unittest.skip
     def test_errors(self):
         ap = autopage.AutoPager(self.stream,
                                 errors=autopage.ErrorStrategy.NAME_REPLACE)
@@ -188,7 +187,6 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.assertEqual('namereplace', ap._errors())
         self.assertEqual(self.default_lb, ap._line_buffering())
 
-    @unittest.skip
     def test_line_buffering_on_errors(self):
         ap = autopage.AutoPager(self.stream,
                                 line_buffering=True,
