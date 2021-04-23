@@ -10,6 +10,7 @@
 #   License for the specific language governing permissions and limitations
 #   under the License.
 
+import sys
 import unittest
 from unittest import mock
 
@@ -134,3 +135,69 @@ class CleanupTest(unittest.TestCase):
                 # real streams (but not for StringIO).
                 stream.flush = mock.MagicMock(side_effect=ValueError)
             self.assertTrue(out.stream.closed)
+
+
+class StreamConfigureTest(fixtures.TestWithFixtures):
+    def setUp(self):
+        out = sinks.TempFixture()
+        self.useFixture(out)
+        self.stream = out.stream
+        self.default_lb = self.stream.line_buffering
+        self.default_errors = self.stream.errors
+        self.encoding = self.stream.encoding
+
+    def test_line_buffering_on(self):
+        ap = autopage.AutoPager(self.stream, line_buffering=True)
+        ap._reconfigure_output_stream()
+        self.addCleanup(ap._out.close)
+        self.assertTrue(ap._out.line_buffering)
+        self.assertEqual(self.default_errors, ap._out.errors)
+        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertIs(True, ap._line_buffering())
+        self.assertEqual(self.default_errors, ap._errors())
+
+    def test_line_buffering_off(self):
+        ap = autopage.AutoPager(self.stream, line_buffering=False)
+        ap._reconfigure_output_stream()
+        self.addCleanup(ap._out.close)
+        self.assertFalse(ap._out.line_buffering)
+        self.assertEqual(self.default_errors, ap._out.errors)
+        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertIs(False, ap._line_buffering())
+        self.assertEqual(self.default_errors, ap._errors())
+
+    def test_stdout_line_buffering_on(self):
+        with fixtures.MonkeyPatch('sys.stdout', self.stream):
+            ap = autopage.AutoPager(line_buffering=True)
+            ap._reconfigure_output_stream()
+            self.addCleanup(ap._out.close)
+            self.assertTrue(sys.stdout.line_buffering)
+            self.assertEqual(self.default_errors, sys.stdout.errors)
+            self.assertEqual(self.encoding, sys.stdout.encoding)
+
+    @unittest.skip
+    def test_errors(self):
+        ap = autopage.AutoPager(self.stream,
+                                errors=autopage.ErrorStrategy.NAME_REPLACE)
+        ap._reconfigure_output_stream()
+        self.addCleanup(ap._out.close)
+        self.assertEqual(self.default_lb, ap._out.line_buffering)
+        self.assertEqual('namereplace', ap._out.errors)
+        self.assertNotEqual(self.default_errors, ap._out.errors)
+        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual('namereplace', ap._errors())
+        self.assertEqual(self.default_lb, ap._line_buffering())
+
+    @unittest.skip
+    def test_line_buffering_on_errors(self):
+        ap = autopage.AutoPager(self.stream,
+                                line_buffering=True,
+                                errors=autopage.ErrorStrategy.NAME_REPLACE)
+        ap._reconfigure_output_stream()
+        self.addCleanup(ap._out.close)
+        self.assertTrue(ap._out.line_buffering)
+        self.assertEqual('namereplace', ap._out.errors)
+        self.assertNotEqual(self.default_errors, ap._out.errors)
+        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertIs(True, ap._line_buffering())
+        self.assertEqual('namereplace', ap._errors())

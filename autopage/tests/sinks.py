@@ -27,9 +27,19 @@ class TTYFixture(fixtures.Fixture):
 
 
 class TempFixture(fixtures.Fixture):
+    def __init__(self, nativeio=True):
+        self._nativeio = nativeio
+
     def _setUp(self):
         self.stream = tempfile.TemporaryFile('w')
-        self.addCleanup(self.stream.close)
+
+        def close():
+            try:
+                self.stream.close()
+            except ValueError:
+                pass
+
+        self.addCleanup(close)
 
 
 class BufferFixture(fixtures.Fixture):
