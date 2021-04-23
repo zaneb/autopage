@@ -35,6 +35,18 @@ class ToTerminalTest(unittest.TestCase):
             ap = autopage.AutoPager(out.stream)
             self.assertFalse(ap.to_terminal())
 
+    def test_default_pty(self):
+        with sinks.TTYFixture() as out:
+            with fixtures.MonkeyPatch('sys.stdout', out.stream):
+                ap = autopage.AutoPager()
+            self.assertTrue(ap.to_terminal())
+
+    def test_default_file(self):
+        with sinks.TempFixture() as out:
+            with fixtures.MonkeyPatch('sys.stdout', out.stream):
+                ap = autopage.AutoPager()
+            self.assertFalse(ap.to_terminal())
+
 
 class ExitCodeTest(fixtures.TestWithFixtures):
     def setUp(self):
