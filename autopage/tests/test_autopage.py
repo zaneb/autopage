@@ -11,6 +11,7 @@
 #   under the License.
 
 import unittest
+from unittest import mock
 
 import fixtures
 
@@ -101,3 +102,35 @@ class ExitCodeTest(fixtures.TestWithFixtures):
 
         self.assertRaises(SystemExit, run)
         self.assertEqual(42, self.ap.exit_code())
+
+
+class CleanupTest(unittest.TestCase):
+    def test_no_pager_stream_not_closed(self):
+        flush = mock.MagicMock()
+        with sinks.BufferFixture() as out:
+            with autopage.AutoPager(out.stream) as stream:
+                stream.flush = flush
+                stream.write('foo')
+                pass
+            self.assertFalse(out.stream.closed)
+        flush.assert_called_once()
+
+    def test_no_pager_broken_pipe(self):
+        flush = mock.MagicMock(side_effect=BrokenPipeError)
+        with sinks.BufferFixture() as out:
+            with autopage.AutoPager(out.stream) as stream:
+                stream.flush = flush
+                stream.write('foo')
+                pass
+            self.assertTrue(out.stream.closed)
+        flush.assert_called_once()
+
+    def test_no_pager_stream_closed(self):
+        with sinks.BufferFixture() as out:
+            with autopage.AutoPager(out.stream) as stream:
+                stream.write('foo')
+                stream.close()
+                # Calling flush() on a closed stream raises an exception for
+                # real streams (but not for StringIO).
+                stream.flush = mock.MagicMock(side_effect=ValueError)
+            self.assertTrue(out.stream.closed)
