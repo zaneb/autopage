@@ -17,6 +17,18 @@ import fixtures
 import autopage
 
 
+class CommandTest(unittest.TestCase):
+    def test_cmd_default(self):
+        ap = autopage.AutoPager()
+        self.assertListEqual(['less'], ap._pager_cmd())
+
+    def test_cmd_override(self):
+        ap = autopage.AutoPager()
+        with fixtures.EnvironmentVariable('PAGER', 'foo'):
+            cmd = ap._pager_cmd()
+        self.assertEqual('foo', cmd)
+
+
 class EnvironmentTest(unittest.TestCase):
     def test_less_defaults(self):
         ap = autopage.AutoPager()
