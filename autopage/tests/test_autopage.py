@@ -10,6 +10,7 @@
 #   License for the specific language governing permissions and limitations
 #   under the License.
 
+import subprocess
 import sys
 import unittest
 from unittest import mock
@@ -19,6 +20,90 @@ import fixtures
 from autopage.tests import sinks
 
 import autopage
+
+
+class PagedStreamTest(fixtures.TestWithFixtures):
+    def setUp(self):
+        out = sinks.TTYFixture()
+        self.useFixture(out)
+        self.stream = out.stream
+        self.useFixture(fixtures.MonkeyPatch('sys.stdout', self.stream))
+        popen = fixtures.MockPatch('subprocess.Popen')
+        self.useFixture(popen)
+        self.popen = popen.mock
+
+    def test_defaults(self):
+        ap = autopage.AutoPager(line_buffering=False)
+        with mock.patch.object(ap, '_pager_env') as get_env, \
+                mock.patch.object(ap, '_pager_cmd') as cmd:
+            stream = ap._paged_stream()
+            self.popen.assert_called_once_with(
+                cmd.return_value,
+                env=get_env.return_value,
+                bufsize=-1,
+                universal_newlines=True,
+                encoding='UTF-8',
+                errors='strict',
+                stdin=subprocess.PIPE,
+                stdout=None)
+            self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_line_buffering(self):
+        ap = autopage.AutoPager(line_buffering=True)
+        stream = ap._paged_stream()
+        self.popen.assert_called_once_with(
+            mock.ANY,
+            env=mock.ANY,
+            bufsize=1,
+            universal_newlines=True,
+            encoding=mock.ANY,
+            errors=mock.ANY,
+            stdin=subprocess.PIPE,
+            stdout=None)
+        self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_errors(self):
+        ap = autopage.AutoPager(errors=autopage.ErrorStrategy.NAME_REPLACE)
+        stream = ap._paged_stream()
+        self.popen.assert_called_once_with(
+            mock.ANY,
+            env=mock.ANY,
+            bufsize=mock.ANY,
+            universal_newlines=mock.ANY,
+            encoding=mock.ANY,
+            errors='namereplace',
+            stdin=subprocess.PIPE,
+            stdout=None)
+        self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_explicit_stdout_stream(self):
+        ap = autopage.AutoPager(self.stream)
+        stream = ap._paged_stream()
+        self.popen.assert_called_once_with(
+            mock.ANY,
+            env=mock.ANY,
+            bufsize=mock.ANY,
+            universal_newlines=mock.ANY,
+            encoding=mock.ANY,
+            errors=mock.ANY,
+            stdin=subprocess.PIPE,
+            stdout=None)
+        self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_explicit_stream(self):
+        with sinks.TTYFixture() as tty:
+            ap = autopage.AutoPager(tty.stream)
+            stream = ap._paged_stream()
+            self.popen.assert_called_once_with(
+                mock.ANY,
+                env=mock.ANY,
+                bufsize=mock.ANY,
+                universal_newlines=mock.ANY,
+                encoding=mock.ANY,
+                errors=mock.ANY,
+                stdin=subprocess.PIPE,
+                stdout=tty.stream)
+            self.assertIs(stream, self.popen.return_value.stdin)
 
 
 class ToTerminalTest(unittest.TestCase):
