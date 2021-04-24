@@ -242,6 +242,94 @@ class CleanupTest(unittest.TestCase):
                 stream.flush = mock.MagicMock(side_effect=ValueError)
             self.assertTrue(out.stream.closed)
 
+    def test_pager_stream_not_closed(self):
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.stdin = pager_in.stream
+                    with ap as stream:
+                        self.assertIs(pager_in.stream, stream)
+                    self.assertTrue(pager_in.stream.closed)
+
+    def test_pager_stream_not_closed_interrupt(self):
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.stdin = pager_in.stream
+
+                    def run():
+                        with ap as stream:
+                            self.assertIs(pager_in.stream, stream)
+                            raise KeyboardInterrupt
+
+                    self.assertRaises(KeyboardInterrupt, run)
+                    self.assertTrue(pager_in.stream.closed)
+
+    def test_pager_broken_pipe(self):
+        flush = mock.MagicMock(side_effect=BrokenPipeError)
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.stdin = pager_in.stream
+                    pager_in.stream.flush = flush
+                    with ap as stream:
+                        self.assertIs(pager_in.stream, stream)
+                    self.assertTrue(pager_in.stream.closed)
+                    popen.mock.return_value.wait.assert_called_once()
+
+    def test_pager_stream_closed(self):
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.stdin = pager_in.stream
+                    with ap as stream:
+                        self.assertIs(pager_in.stream, stream)
+                        stream.close()
+                    popen.mock.return_value.wait.assert_called_once()
+
+    def test_pager_interrupt_after_complete(self):
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.wait.side_effect = [
+                        KeyboardInterrupt,
+                        KeyboardInterrupt,
+                        None,
+                    ]
+                    popen.mock.return_value.stdin = pager_in.stream
+                    with ap as stream:
+                        self.assertIs(pager_in.stream, stream)
+                    self.assertTrue(pager_in.stream.closed)
+                    popen.mock.return_value.wait.assert_called()
+                    self.assertEqual(0, ap.exit_code())
+
+    def test_pager_multiple_interrupts(self):
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.wait.side_effect = [
+                        KeyboardInterrupt,
+                        KeyboardInterrupt,
+                        None,
+                    ]
+                    popen.mock.return_value.stdin = pager_in.stream
+
+                    def run():
+                        with ap as stream:
+                            self.assertIs(pager_in.stream, stream)
+                            raise KeyboardInterrupt
+
+                    self.assertRaises(KeyboardInterrupt, run)
+                    self.assertTrue(pager_in.stream.closed)
+                    popen.mock.return_value.wait.assert_called()
+                    self.assertEqual(130, ap.exit_code())
+
 
 class StreamConfigureTest(fixtures.TestWithFixtures):
     def setUp(self):
