@@ -26,7 +26,7 @@ import sys
 
 import types
 import typing
-from typing import Any, Optional, Type, Union, Dict, List, TextIO
+from typing import Any, Optional, Type, Dict, List, TextIO
 
 
 _SIGNAL_EXIT_BASE = 128
@@ -137,9 +137,12 @@ class AutoPager:
                     if self._use_stdout:
                         sys.stdout = self._out
 
-    def _pager_cmd(self) -> Union[List[str], str]:
+    def _pager_cmd(self) -> List[str]:
         pager = os.getenv('PAGER')
-        return ['less'] if pager is None else pager
+        if pager is not None:
+            import shlex
+            return shlex.split(pager)
+        return ['less']
 
     def _pager_env(self) -> Optional[Dict[str, str]]:
         less_flags = []

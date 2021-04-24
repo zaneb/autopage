@@ -24,9 +24,9 @@ class CommandTest(unittest.TestCase):
 
     def test_cmd_override(self):
         ap = autopage.AutoPager()
-        with fixtures.EnvironmentVariable('PAGER', 'foo'):
+        with fixtures.EnvironmentVariable('PAGER', 'less "-r" +F'):
             cmd = ap._pager_cmd()
-        self.assertEqual('foo', cmd)
+        self.assertListEqual(['less', '-r', '+F'], cmd)
 
 
 class EnvironmentTest(unittest.TestCase):
