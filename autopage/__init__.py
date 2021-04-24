@@ -58,11 +58,13 @@ class AutoPager:
                  output_stream: Optional[TextIO] = None, *,
                  allow_color: bool = True,
                  line_buffering: Optional[bool] = None,
+                 reset_on_exit: bool = False,
                  errors: Optional[ErrorStrategy] = None):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = self._out.isatty()
         self._color = allow_color
+        self._reset = reset_on_exit
         self._set_line_buffering = line_buffering
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
@@ -151,12 +153,19 @@ class AutoPager:
             # in raw form.
             # Equivalent to the --RAW-CONTROL-CHARS argument
             less_flags.append('R')
-        if not self._line_buffering():
+        if not self._line_buffering() and not self._reset:
             # This option will cause less to buffer until an entire screen's
             # worth of data is available (or the EOF is reached), so don't
-            # enable it when line buffering is requested.
+            # enable it when line buffering is requested. It also does not
+            # reset the terminal after exiting, so don't enable it when
+            # resetting the terminal is requested.
             # Equivalent to the --quit-if-one-screen argument
             less_flags.append('F')
+        if not self._reset:
+            # This option will cause less to not reset the terminal after
+            # exiting.
+            # Equivalent to the --no-init argument
+            less_flags.append('X')
 
         if not (less_flags and (os.getenv('LESS') is None)):
             return None

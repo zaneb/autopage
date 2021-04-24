@@ -89,6 +89,15 @@ with autopage.AutoPager(line_buffering=line_buffer_from_input()) as out:
         out.write(l)
 ```
 
+## Terminal reset
+
+By default, when the pager exits it will leave the latest displayed output on
+screen in the terminal. This can be changed by passing `True` for the
+`reset_on_exit` argument to the `AutoPager` class. If this option is set, the
+terminal will be cleared when the pager exits, returning to its position prior
+to starting the pager (as is the case by default when running `less` manually
+from the command line).
+
 ## Exit code
 
 Programs may wish to return a different exit code if they are interrupted by
@@ -109,6 +118,7 @@ def process(input_stream, output_stream):
         output_stream,
         line_buffering=autopage.line_buffered_input(input_stream),
         allow_color=True,
+        reset_on_exit=True,
         errors=autopage.ErrorStrategy.REPLACE,
     )
 
