@@ -144,6 +144,18 @@ class ToTerminalTest(unittest.TestCase):
                 self.assertIs(page.return_value, stream)
                 reconf.assert_not_called()
 
+    def test_launch_pager_fail(self):
+        outstream = mock.Mock()
+        ap = autopage.AutoPager(outstream)
+        with mock.patch.object(ap, 'to_terminal', return_value=True), \
+                mock.patch.object(ap, '_paged_stream',
+                                  side_effect=OSError) as page, \
+                mock.patch.object(ap, '_reconfigure_output_stream') as reconf:
+            with ap as stream:
+                page.assert_called_once()
+                reconf.assert_called_once()
+                self.assertIs(outstream, stream)
+
     def test_no_pager(self):
         outstream = mock.Mock()
         ap = autopage.AutoPager(outstream)

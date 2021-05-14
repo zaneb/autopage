@@ -79,10 +79,12 @@ class AutoPager:
         # Only invoke the pager if the output is going to a tty; if it is
         # being sent to a file or pipe then we don't want the pager involved
         if self.to_terminal():
-            return self._paged_stream()
-        else:
-            self._reconfigure_output_stream()
-            return self._out
+            try:
+                return self._paged_stream()
+            except OSError:
+                pass
+        self._reconfigure_output_stream()
+        return self._out
 
     def _line_buffering(self) -> bool:
         if self._set_line_buffering is None:
