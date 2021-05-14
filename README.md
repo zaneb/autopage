@@ -46,6 +46,20 @@ If you are explicitly passing a stream to write to (rather than directly
 referencing a global variable such as `sys.stdout` then you may be able to add
 automatic paging support with only a single line of code.
 
+## Paging help output
+
+If your program uses the `argparse` module from the standard library, you can
+ensure that the help output is automatically paged when possible by changing
+the import statement to:
+
+```python
+from autopage import argparse
+```
+
+If you don't control the module that imports `argparse`, you can instead call
+`autopage.argparse.monkey_patch()` to patch the module directly. This function
+can also be used as a context manager.
+
 ## Environment
 
 The end user can override the pager command by setting the `PAGER` environment
