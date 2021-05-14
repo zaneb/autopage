@@ -64,10 +64,25 @@ class EnvironmentTest(unittest.TestCase):
         ap = autopage.AutoPager(line_buffering=True,
                                 allow_color=False,
                                 reset_on_exit=True)
-        self.assertIsNone(ap._pager_env())
+        self.assertNotIn('LESS', ap._pager_env())
 
     def test_less_user_override(self):
         ap = autopage.AutoPager()
         with fixtures.EnvironmentVariable('LESS', 'abc'):
             env = ap._pager_env()
-        self.assertIsNone(env)
+        self.assertEqual('abc', env['LESS'])
+
+    def test_lv_defaults(self):
+        ap = autopage.AutoPager()
+        lv_env = ap._pager_env()['LV']
+        self.assertEqual('-c', lv_env)
+
+    def test_lv_nocolour(self):
+        ap = autopage.AutoPager(allow_color=False)
+        self.assertNotIn('LV', ap._pager_env())
+
+    def test_lv_user_override(self):
+        ap = autopage.AutoPager()
+        with fixtures.EnvironmentVariable('LV', 'abc'):
+            env = ap._pager_env()
+        self.assertEqual('abc', env['LV'])

@@ -150,11 +150,14 @@ class AutoPager:
 
     def _pager_env(self) -> Optional[Dict[str, str]]:
         less_flags = []
+        lv_flags = []
         if self._color:
             # This option will cause less to output ANSI color escape sequences
             # in raw form.
             # Equivalent to the --RAW-CONTROL-CHARS argument
             less_flags.append('R')
+            # This option allows ANSI color escape sequences in lv
+            lv_flags.append('-c')
         if not self._line_buffering() and not self._reset:
             # This option will cause less to buffer until an entire screen's
             # worth of data is available (or the EOF is reached), so don't
@@ -169,11 +172,11 @@ class AutoPager:
             # Equivalent to the --no-init argument
             less_flags.append('X')
 
-        if not (less_flags and (os.getenv('LESS') is None)):
-            return None
-
         env = dict(os.environ)
-        env['LESS'] = ''.join(less_flags)
+        if less_flags and (os.getenv('LESS') is None):
+            env['LESS'] = ''.join(less_flags)
+        if lv_flags and (os.getenv('LV') is None):
+            env['LV'] = ' '.join(lv_flags)
         return env
 
     def _paged_stream(self) -> TextIO:
