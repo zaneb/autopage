@@ -110,7 +110,9 @@ class _HelpAction(argparse._HelpAction):
                  namespace: argparse.Namespace,
                  values: Union[Text, Sequence[Any], None],
                  option_string: Optional[Text] = None) -> None:
-        pager = autopage.AutoPager(reset_on_exit=False)
+        pager = autopage.AutoPager(allow_color=True,
+                                   line_buffering=False,
+                                   reset_on_exit=False)
         with pager as out:
             setattr(parser, '_color', pager.to_terminal())
             parser.print_help(out)
