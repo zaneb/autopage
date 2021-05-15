@@ -44,7 +44,7 @@ class _HelpAction(argparse._HelpAction):
     def __init__(self,
                  option_strings: Sequence[Text],
                  dest: Text = argparse.SUPPRESS,
-                 default: Any = argparse.SUPPRESS,
+                 default: Text = argparse.SUPPRESS,
                  help: Optional[Text] = None) -> None:
         argparse.Action.__init__(
             self,
