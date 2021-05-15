@@ -32,12 +32,64 @@ restored.
 
 import argparse
 import contextlib
-from typing import Any, Sequence, Text, Optional, Union
-from typing import ContextManager, Generator
+import types
+from typing import Any, Sequence, Text, Tuple, Type, Optional, Union
+from typing import Callable, ContextManager, Generator
 
 import autopage
 
 from argparse import *  # noqa
+
+
+_HelpFormatter = argparse.HelpFormatter
+
+
+class ColorHelpFormatter(_HelpFormatter):
+    class _Section(_HelpFormatter._Section):  # type: ignore
+        @property
+        def heading(self) -> Optional[Text]:
+            if (not self._heading
+                    or self._heading == argparse.SUPPRESS
+                    or not getattr(self.formatter, '_color', False)):
+                return self._heading
+            return f'\033[4m{self._heading}\033[0m'
+
+        @heading.setter
+        def heading(self, heading: Optional[Text]) -> None:
+            self._heading = heading
+
+    def _metavar_formatter(self,
+                           action: argparse.Action,
+                           default_metavar: Text) -> Callable[[int],
+                                                              Tuple[str, ...]]:
+        get_metavars = super()._metavar_formatter(action, default_metavar)
+        if not getattr(self, '_color', False):
+            return get_metavars
+
+        def color_metavar(size: int) -> Tuple[str, ...]:
+            return tuple(f'\033[3m{mv}\033[0m' for mv in get_metavars(size))
+        return color_metavar
+
+
+class ColorRawDescriptionHelpFormatter(ColorHelpFormatter,
+                                       argparse.RawDescriptionHelpFormatter):
+    """Help message formatter which retains any formatting in descriptions."""
+
+
+class ColorRawTextHelpFormatter(ColorHelpFormatter,
+                                argparse.RawTextHelpFormatter):
+    """Help message formatter which retains formatting of all help text."""
+
+
+class ColorArgDefaultsHelpFormatter(ColorHelpFormatter,
+                                    argparse.ArgumentDefaultsHelpFormatter):
+    """Help message formatter which adds default values to argument help."""
+
+
+class ColorMetavarTypeHelpFormatter(ColorHelpFormatter,
+                                    argparse.MetavarTypeHelpFormatter):
+    """Help message formatter which uses the argument 'type' as the default
+    metavar value (instead of the argument 'dest')"""
 
 
 class _HelpAction(argparse._HelpAction):
@@ -60,6 +112,7 @@ class _HelpAction(argparse._HelpAction):
                  option_string: Optional[Text] = None) -> None:
         pager = autopage.AutoPager(reset_on_exit=False)
         with pager as out:
+            setattr(parser, '_color', pager.to_terminal())
             parser.print_help(out)
         parser.exit(pager.exit_code())
 
@@ -70,11 +123,31 @@ class _ActionsContainer(argparse._ActionsContainer):
         self.register('action', 'help', _HelpAction)
 
 
+def _substitute_formatter(
+            get_fmtr: Callable[[Any], _HelpFormatter]
+        ) -> Callable[[argparse.ArgumentParser], _HelpFormatter]:
+    def _get_formatter(parser: argparse.ArgumentParser) -> _HelpFormatter:
+        if parser.formatter_class is _HelpFormatter:
+            parser.formatter_class = ColorHelpFormatter
+        formatter = get_fmtr(parser)
+        if isinstance(formatter, ColorHelpFormatter):
+            setattr(formatter, '_color', getattr(parser, '_color', False))
+        return formatter
+    return _get_formatter
+
+
 class AutoPageArgumentParser(argparse.ArgumentParser, _ActionsContainer):
-    pass
+    @_substitute_formatter
+    def _get_formatter(self) -> _HelpFormatter:
+        return super()._get_formatter()
 
 
-ArgumentParser = AutoPageArgumentParser  # type: ignore
+ArgumentParser = AutoPageArgumentParser                         # type: ignore
+HelpFormatter = ColorHelpFormatter                              # type: ignore
+RawDescriptionHelpFormatter = ColorRawDescriptionHelpFormatter  # type: ignore
+RawTextHelpFormatter = ColorRawTextHelpFormatter                # type: ignore
+ArgumentDefaultsHelpFormatter = ColorArgDefaultsHelpFormatter   # type: ignore
+MetavarTypeHelpFormatter = ColorMetavarTypeHelpFormatter        # type: ignore
 
 
 def monkey_patch() -> ContextManager:
@@ -84,15 +157,43 @@ def monkey_patch() -> ContextManager:
     The result of calling this function can optionally be used as a context
     manager to restore the status quo when it exits.
     """
-    orig_HelpAction = argparse._HelpAction
-    argparse._HelpAction = _HelpAction  # type: ignore
+    import sys
+
+    def get_existing_classes(module: types.ModuleType) -> Tuple[Type, ...]:
+        return (
+            module._HelpAction,                    # type: ignore
+            module.HelpFormatter,                  # type: ignore
+            module.RawDescriptionHelpFormatter,    # type: ignore
+            module.RawTextHelpFormatter,           # type: ignore
+            module.ArgumentDefaultsHelpFormatter,  # type: ignore
+            module.MetavarTypeHelpFormatter,       # type: ignore
+        )  # type: ignore
+
+    def patch_classes(module: types.ModuleType,
+                      impl: Tuple[Type, ...]) -> None:
+        (
+            module._HelpAction,                    # type: ignore
+            module.HelpFormatter,                  # type: ignore
+            module.RawDescriptionHelpFormatter,    # type: ignore
+            module.RawTextHelpFormatter,           # type: ignore
+            module.ArgumentDefaultsHelpFormatter,  # type: ignore
+            module.MetavarTypeHelpFormatter,       # type: ignore
+        ) = impl
+
+    orig = get_existing_classes(argparse)
+    orig_fmtr = argparse.ArgumentParser._get_formatter
+    patched = get_existing_classes(sys.modules[__name__])
+    patch_classes(argparse, patched)
+    new_fmtr = _substitute_formatter(orig_fmtr)
+    argparse.ArgumentParser._get_formatter = new_fmtr  # type: ignore
 
     @contextlib.contextmanager
     def unpatcher() -> Generator:
         try:
             yield
         finally:
-            argparse._HelpAction = orig_HelpAction  # type: ignore
+            patch_classes(argparse, orig)
+            argparse.ArgumentParser._get_formatter = orig_fmtr  # type: ignore
 
     return unpatcher()
 
