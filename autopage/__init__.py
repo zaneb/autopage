@@ -179,9 +179,7 @@ class AutoPager:
             env['LV'] = ' '.join(lv_flags)
         return env
 
-    def _paged_stream(self) -> TextIO:
-        buffer_size = 1 if self._line_buffering() else -1
-        out_stream: Optional[TextIO] = None
+    def _pager_out_stream(self) -> Optional[TextIO]:
         if not self._use_stdout:
             try:
                 # Ensure the output stream has a file descriptor
@@ -189,7 +187,11 @@ class AutoPager:
             except OSError:
                 pass
             else:
-                out_stream = self._out
+                return self._out
+        return None
+
+    def _paged_stream(self) -> TextIO:
+        buffer_size = 1 if self._line_buffering() else -1
         self._pager = subprocess.Popen(self._pager_cmd(),
                                        env=self._pager_env(),
                                        bufsize=buffer_size,
@@ -197,7 +199,7 @@ class AutoPager:
                                        encoding=self._encoding(),
                                        errors=self._errors(),
                                        stdin=subprocess.PIPE,
-                                       stdout=out_stream)
+                                       stdout=self._pager_out_stream())
         assert self._pager.stdin is not None
         return typing.cast(TextIO, self._pager.stdin)
 
@@ -221,18 +223,23 @@ class AutoPager:
                 else:
                     break
         else:
-            try:
-                if not self._out.closed:
-                    self._out.flush()
-            except BrokenPipeError:
-                try:
-                    # Other end of pipe already closed, so close the stream now
-                    # and handle the error.
-                    self._out.close()
-                except BrokenPipeError:
-                    # This will always happen
-                    pass
+            self._flush_output()
+        return self._process_exception(exc)
 
+    def _flush_output(self) -> None:
+        try:
+            if not self._out.closed:
+                self._out.flush()
+        except BrokenPipeError:
+            try:
+                # Other end of pipe already closed, so close the stream now
+                # and handle the error.
+                self._out.close()
+            except BrokenPipeError:
+                # This will always happen
+                pass
+
+    def _process_exception(self, exc: Optional[BaseException]) -> bool:
         if exc is not None:
             if isinstance(exc, BrokenPipeError):
                 # Exit code for SIGPIPE
