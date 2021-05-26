@@ -88,7 +88,7 @@ class AutoPager:
 
     def _line_buffering(self) -> bool:
         if self._set_line_buffering is None:
-            return getattr(self._out, 'line_buffering', False)
+            return getattr(self._out, 'line_buffering', self._tty)
         return self._set_line_buffering
 
     def _encoding(self) -> str:
@@ -158,12 +158,12 @@ class AutoPager:
             less_flags.append('R')
             # This option allows ANSI color escape sequences in lv
             lv_flags.append('-c')
-        if not self._line_buffering() and not self._reset:
+        if not self._set_line_buffering and not self._reset:
             # This option will cause less to buffer until an entire screen's
             # worth of data is available (or the EOF is reached), so don't
-            # enable it when line buffering is requested. It also does not
-            # reset the terminal after exiting, so don't enable it when
-            # resetting the terminal is requested.
+            # enable it when line buffering is explicitly requested. It also
+            # does not reset the terminal after exiting, so don't enable it
+            # when resetting the terminal is requested.
             # Equivalent to the --quit-if-one-screen argument
             less_flags.append('F')
         if not self._reset:
