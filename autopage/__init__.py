@@ -18,9 +18,12 @@ A library to provide automatic paging for console output.
 By Zane Bitter.
 """
 
+import asyncio
+import codecs
 import enum
 import io
 import os
+import signal
 import subprocess
 import sys
 
@@ -69,6 +72,7 @@ class AutoPager:
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
         self._pager: Optional[subprocess.Popen] = None
+        self._async_pager = None
         self._exit_code = 0
 
     def to_terminal(self) -> bool:
@@ -81,6 +85,17 @@ class AutoPager:
         if self.to_terminal():
             try:
                 return self._paged_stream()
+            except OSError:
+                pass
+        self._reconfigure_output_stream()
+        return self._out
+
+    async def __aenter__(self) -> TextIO:
+        # Only invoke the pager if the output is going to a tty; if it is
+        # being sent to a file or pipe then we don't want the pager involved
+        if self.to_terminal():
+            try:
+                return await self._paged_async_stream()
             except OSError:
                 pass
         self._reconfigure_output_stream()
@@ -203,6 +218,27 @@ class AutoPager:
         assert self._pager.stdin is not None
         return typing.cast(TextIO, self._pager.stdin)
 
+    async def _handle_async_pager_exit(self, task):
+        await self._async_pager.wait()
+        task.cancel('Pager exited')
+
+    async def _paged_async_stream(self) -> TextIO:
+        self._async_pager = await asyncio.create_subprocess_exec(
+            *self._pager_cmd(),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=self._pager_out_stream(),
+            env=self._pager_env())
+        loop = asyncio.get_running_loop()
+        current_task = asyncio.current_task(loop)
+        cleanup = loop.create_task(self._handle_async_pager_exit(current_task))
+        self._async_cleanup_task = cleanup
+
+        assert self._async_pager.stdin is not None
+        streamWriter = codecs.getwriter(self._encoding())
+        self._async_stream = streamWriter(self._async_pager.stdin,
+                                          self._errors())
+        return self._async_stream
+
     def __exit__(self,
                  exc_type: Optional[Type[BaseException]],
                  exc: Optional[BaseException],
@@ -226,6 +262,34 @@ class AutoPager:
             self._flush_output()
         return self._process_exception(exc)
 
+    async def __aexit__(self,
+                        exc_type: Optional[Type[BaseException]],
+                        exc: Optional[BaseException],
+                        traceback: Optional[types.TracebackType]) -> bool:
+        if self._async_pager is not None:
+            self._async_cleanup_task.cancel()
+
+            # Pager ignores Ctrl-C, so we should too
+            int_handler = signal.getsignal(signal.SIGINT)
+            try:
+                signal.signal(signal.SIGINT, signal.SIG_IGN)
+                try:
+                    if not self._async_pager.stdin.is_closing():
+                        await self._async_pager.stdin.drain()
+                    self._async_stream.close()
+                    await self._async_pager.stdin.wait_closed()
+                except ConnectionResetError:
+                    # Other end of pipe already closed
+                    pass
+                # Wait for user to exit pager
+                await self._async_pager.wait()
+            finally:
+                if int_handler is not None:
+                    signal.signal(signal.SIGINT, int_handler)
+        else:
+            self._flush_output()
+        return self._process_exception(exc)
+
     def _flush_output(self) -> None:
         try:
             if not self._out.closed:
@@ -241,7 +305,7 @@ class AutoPager:
 
     def _process_exception(self, exc: Optional[BaseException]) -> bool:
         if exc is not None:
-            if isinstance(exc, BrokenPipeError):
+            if isinstance(exc, (BrokenPipeError, asyncio.CancelledError)):
                 # Exit code for SIGPIPE
                 self._exit_code = _SIGNAL_EXIT_BASE + 13
                 # Suppress exceptions caused by a broken pipe (indicating that
