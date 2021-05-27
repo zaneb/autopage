@@ -31,6 +31,7 @@ import types
 import typing
 from typing import Any, Optional, Type, Dict, List, TextIO
 
+_SignalHandler = typing.Callable[[signal.Signals, types.FrameType], Any]
 
 _SIGNAL_EXIT_BASE = 128
 
@@ -72,7 +73,8 @@ class AutoPager:
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
         self._pager: Optional[subprocess.Popen] = None
-        self._async_pager = None
+        self._async_stream: Optional[TextIO] = None
+        self._async_pager: Optional[asyncio.subprocess.Process] = None
         self._exit_code = 0
 
     def to_terminal(self) -> bool:
@@ -218,15 +220,14 @@ class AutoPager:
         assert self._pager.stdin is not None
         return typing.cast(TextIO, self._pager.stdin)
 
-    async def _handle_async_pager_exit(self, task):
+    async def _handle_async_pager_exit(self, task: asyncio.Task) -> None:
+        assert self._async_pager is not None
         await self._async_pager.wait()
         task.cancel('Pager exited')
 
-    def _interrupt_handler(self):
-        loop = asyncio.get_running_loop()
-        task = asyncio.current_task(loop)
-
-        def handle_interrupt(signum, frame):
+    def _interrupt_handler(self, task: asyncio.Task) -> _SignalHandler:
+        def handle_interrupt(signum: signal.Signals,
+                             frame: types.FrameType) -> None:
             if not task.done():
                 task.cancel('SIGINT received')
 
@@ -240,15 +241,19 @@ class AutoPager:
             env=self._pager_env())
         loop = asyncio.get_running_loop()
         current_task = asyncio.current_task(loop)
+        assert current_task is not None
         cleanup = loop.create_task(self._handle_async_pager_exit(current_task))
         self._async_cleanup_task = cleanup
-        self._old_int_handler = signal.signal(signal.SIGINT,
-                                              self._interrupt_handler())
+        new_int_handler = self._interrupt_handler(current_task)
+        self._old_int_handler = signal.signal(signal.SIGINT, new_int_handler)
 
-        assert self._async_pager.stdin is not None
+        stdin_bytes = typing.cast(typing.BinaryIO, self._async_pager.stdin)
         streamWriter = codecs.getwriter(self._encoding())
-        self._async_stream = streamWriter(self._async_pager.stdin,
-                                          self._errors())
+        streamReader = codecs.getreader(self._encoding())
+        self._async_stream = codecs.StreamReaderWriter(stdin_bytes,
+                                                       streamReader,
+                                                       streamWriter,
+                                                       errors=self._errors())
         return self._async_stream
 
     def __exit__(self,
@@ -283,10 +288,15 @@ class AutoPager:
                 self._async_cleanup_task.cancel()
 
                 try:
-                    if not self._async_pager.stdin.is_closing():
-                        await self._async_pager.stdin.drain()
-                    self._async_stream.close()
-                    await self._async_pager.stdin.wait_closed()
+                    if self._async_pager.stdin is not None:
+                        if sys.version_info >= (3, 7):
+                            if not self._async_pager.stdin.is_closing():
+                                await self._async_pager.stdin.drain()
+                            if self._async_stream is not None:
+                                self._async_stream.close()
+                            await self._async_pager.stdin.wait_closed()
+                        else:
+                            await self._async_pager.stdin.drain()
                 except ConnectionResetError:
                     # Other end of pipe already closed
                     pass
