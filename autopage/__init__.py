@@ -222,6 +222,16 @@ class AutoPager:
         await self._async_pager.wait()
         task.cancel('Pager exited')
 
+    def _interrupt_handler(self):
+        loop = asyncio.get_running_loop()
+        task = asyncio.current_task(loop)
+
+        def handle_interrupt(signum, frame):
+            if not task.done():
+                task.cancel('SIGINT received')
+
+        return handle_interrupt
+
     async def _paged_async_stream(self) -> TextIO:
         self._async_pager = await asyncio.create_subprocess_exec(
             *self._pager_cmd(),
@@ -232,6 +242,8 @@ class AutoPager:
         current_task = asyncio.current_task(loop)
         cleanup = loop.create_task(self._handle_async_pager_exit(current_task))
         self._async_cleanup_task = cleanup
+        self._old_int_handler = signal.signal(signal.SIGINT,
+                                              self._interrupt_handler())
 
         assert self._async_pager.stdin is not None
         streamWriter = codecs.getwriter(self._encoding())
@@ -266,13 +278,10 @@ class AutoPager:
                         exc_type: Optional[Type[BaseException]],
                         exc: Optional[BaseException],
                         traceback: Optional[types.TracebackType]) -> bool:
-        if self._async_pager is not None:
-            self._async_cleanup_task.cancel()
+        try:
+            if self._async_pager is not None:
+                self._async_cleanup_task.cancel()
 
-            # Pager ignores Ctrl-C, so we should too
-            int_handler = signal.getsignal(signal.SIGINT)
-            try:
-                signal.signal(signal.SIGINT, signal.SIG_IGN)
                 try:
                     if not self._async_pager.stdin.is_closing():
                         await self._async_pager.stdin.drain()
@@ -283,12 +292,13 @@ class AutoPager:
                     pass
                 # Wait for user to exit pager
                 await self._async_pager.wait()
-            finally:
-                if int_handler is not None:
-                    signal.signal(signal.SIGINT, int_handler)
-        else:
-            self._flush_output()
-        return self._process_exception(exc)
+            else:
+                self._flush_output()
+            return self._process_exception(exc)
+        finally:
+            if (self._old_int_handler is not None
+                    and signal.getsignal(signal.SIGINT) is not None):
+                signal.signal(signal.SIGINT, self._old_int_handler)
 
     def _flush_output(self) -> None:
         try:
