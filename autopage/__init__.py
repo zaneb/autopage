@@ -78,6 +78,7 @@ class AutoPager:
         self._async_pager: Optional[async_subprocess._AsyncProcess] = None
         self._old_int_handler: typing.Union[_SignalHandler, int,
                                             signal.Handlers, None] = None
+        self._interrupt_task: Optional[asyncio.Task] = None
         self._exit_code = 0
 
     def to_terminal(self) -> bool:
@@ -227,11 +228,18 @@ class AutoPager:
     async def _interrupt_handler(self) -> _SignalHandler:
         loop = asyncio.get_running_loop()
         task = asyncio.current_task(loop)
+        interrupt_received = asyncio.Event()
+
+        async def cancel_task_on_interrupt() -> None:
+            await interrupt_received.wait()
+            if task is not None and not task.done():
+                task.cancel(_SIGINT_CANCEL_MSG)
+
+        self._interrupt_task = loop.create_task(cancel_task_on_interrupt())
 
         def handle_interrupt(signum: signal.Signals,
                              frame: types.FrameType) -> None:
-            if task is not None and not task.done():
-                task.cancel(_SIGINT_CANCEL_MSG)
+            interrupt_received.set()
 
         return handle_interrupt
 
@@ -281,6 +289,9 @@ class AutoPager:
                         traceback: Optional[types.TracebackType]) -> bool:
         try:
             if self._async_pager is not None:
+                if self._interrupt_task is not None:
+                    self._interrupt_task.cancel()
+
                 try:
                     await self._async_pager.stdin_close()
                 except BrokenPipeError:
