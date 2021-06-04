@@ -19,13 +19,14 @@ By Zane Bitter.
 """
 
 import asyncio
-import codecs
 import enum
 import io
 import os
 import signal
 import subprocess
 import sys
+
+from autopage import _async_helper as async_subprocess
 
 import types
 import typing
@@ -73,8 +74,9 @@ class AutoPager:
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
         self._pager: Optional[subprocess.Popen] = None
-        self._async_stream: Optional[TextIO] = None
-        self._async_pager: Optional[asyncio.subprocess.Process] = None
+        self._async_pager: Optional[async_subprocess._AsyncProcess] = None
+        self._old_int_handler: typing.Union[_SignalHandler, int,
+                                            signal.Handlers, None] = None
         self._exit_code = 0
 
     def to_terminal(self) -> bool:
@@ -217,44 +219,37 @@ class AutoPager:
                                        errors=self._errors(),
                                        stdin=subprocess.PIPE,
                                        stdout=self._pager_out_stream())
-        assert self._pager.stdin is not None
-        return typing.cast(TextIO, self._pager.stdin)
+        stream = self._pager.stdin
+        assert stream is not None
+        return typing.cast(TextIO, stream)
 
-    async def _handle_async_pager_exit(self, task: asyncio.Task) -> None:
-        assert self._async_pager is not None
-        await self._async_pager.wait()
-        task.cancel('Pager exited')
+    async def _interrupt_handler(self) -> _SignalHandler:
+        loop = asyncio.get_running_loop()
+        task = asyncio.current_task(loop)
 
-    def _interrupt_handler(self, task: asyncio.Task) -> _SignalHandler:
         def handle_interrupt(signum: signal.Signals,
                              frame: types.FrameType) -> None:
-            if not task.done():
+            if task is not None and not task.done():
                 task.cancel('SIGINT received')
 
         return handle_interrupt
 
     async def _paged_async_stream(self) -> TextIO:
-        self._async_pager = await asyncio.create_subprocess_exec(
-            *self._pager_cmd(),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=self._pager_out_stream(),
-            env=self._pager_env())
-        loop = asyncio.get_running_loop()
-        current_task = asyncio.current_task(loop)
-        assert current_task is not None
-        cleanup = loop.create_task(self._handle_async_pager_exit(current_task))
-        self._async_cleanup_task = cleanup
-        new_int_handler = self._interrupt_handler(current_task)
-        self._old_int_handler = signal.signal(signal.SIGINT, new_int_handler)
+        self._async_pager = await async_subprocess.AsyncPopen(
+            self._pager_cmd(),
+            env=self._pager_env(),
+            text=True,
+            encoding=self._encoding(),
+            errors=self._errors(),
+            stdin=subprocess.PIPE,
+            stdout=self._pager_out_stream())
+        stream = self._async_pager.stdin
+        assert stream is not None
 
-        stdin_bytes = typing.cast(typing.BinaryIO, self._async_pager.stdin)
-        streamWriter = codecs.getwriter(self._encoding())
-        streamReader = codecs.getreader(self._encoding())
-        self._async_stream = codecs.StreamReaderWriter(stdin_bytes,
-                                                       streamReader,
-                                                       streamWriter,
-                                                       errors=self._errors())
-        return self._async_stream
+        self._old_int_handler = signal.signal(signal.SIGINT,
+                                              await self._interrupt_handler())
+
+        return typing.cast(TextIO, stream)
 
     def __exit__(self,
                  exc_type: Optional[Type[BaseException]],
@@ -285,21 +280,12 @@ class AutoPager:
                         traceback: Optional[types.TracebackType]) -> bool:
         try:
             if self._async_pager is not None:
-                self._async_cleanup_task.cancel()
-
                 try:
-                    if self._async_pager.stdin is not None:
-                        if sys.version_info >= (3, 7):
-                            if not self._async_pager.stdin.is_closing():
-                                await self._async_pager.stdin.drain()
-                            if self._async_stream is not None:
-                                self._async_stream.close()
-                            await self._async_pager.stdin.wait_closed()
-                        else:
-                            await self._async_pager.stdin.drain()
-                except ConnectionResetError:
+                    await self._async_pager.stdin_close()
+                except BrokenPipeError:
                     # Other end of pipe already closed
                     pass
+
                 # Wait for user to exit pager
                 await self._async_pager.wait()
             else:
@@ -309,6 +295,7 @@ class AutoPager:
             if (self._old_int_handler is not None
                     and signal.getsignal(signal.SIGINT) is not None):
                 signal.signal(signal.SIGINT, self._old_int_handler)
+                self._old_int_handler = None
 
     def _flush_output(self) -> None:
         try:
