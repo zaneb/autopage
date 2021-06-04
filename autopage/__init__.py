@@ -32,10 +32,7 @@ import types
 import typing
 from typing import Any, Optional, Type, Dict, List, TextIO
 
-_SignalHandler = typing.Callable[[signal.Signals, types.FrameType], Any]
-
 _SIGNAL_EXIT_BASE = 128
-_SIGINT_CANCEL_MSG = 'SIGINT received'
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
 
@@ -76,9 +73,7 @@ class AutoPager:
                             else None)
         self._pager: Optional[subprocess.Popen] = None
         self._async_pager: Optional[async_subprocess._AsyncProcess] = None
-        self._old_int_handler: typing.Union[_SignalHandler, int,
-                                            signal.Handlers, None] = None
-        self._interrupt_task: Optional[asyncio.Task] = None
+        self._interrupt_handler: Optional[async_subprocess.InterruptHandler]
         self._exit_code = 0
 
     def to_terminal(self) -> bool:
@@ -97,6 +92,8 @@ class AutoPager:
         return self._out
 
     async def __aenter__(self) -> TextIO:
+        self._interrupt_handler = await async_subprocess.InterruptHandler()
+
         # Only invoke the pager if the output is going to a tty; if it is
         # being sent to a file or pipe then we don't want the pager involved
         if self.to_terminal():
@@ -225,24 +222,6 @@ class AutoPager:
         assert stream is not None
         return typing.cast(TextIO, stream)
 
-    async def _interrupt_handler(self) -> _SignalHandler:
-        loop = asyncio.get_running_loop()
-        task = asyncio.current_task(loop)
-        interrupt_received = asyncio.Event()
-
-        async def cancel_task_on_interrupt() -> None:
-            await interrupt_received.wait()
-            if task is not None and not task.done():
-                task.cancel(_SIGINT_CANCEL_MSG)
-
-        self._interrupt_task = loop.create_task(cancel_task_on_interrupt())
-
-        def handle_interrupt(signum: signal.Signals,
-                             frame: types.FrameType) -> None:
-            interrupt_received.set()
-
-        return handle_interrupt
-
     async def _paged_async_stream(self) -> TextIO:
         self._async_pager = await async_subprocess.AsyncPopen(
             self._pager_cmd(),
@@ -254,10 +233,6 @@ class AutoPager:
             stdout=self._pager_out_stream())
         stream = self._async_pager.stdin
         assert stream is not None
-
-        self._old_int_handler = signal.signal(signal.SIGINT,
-                                              await self._interrupt_handler())
-
         return typing.cast(TextIO, stream)
 
     def __exit__(self,
@@ -287,11 +262,11 @@ class AutoPager:
                         exc_type: Optional[Type[BaseException]],
                         exc: Optional[BaseException],
                         traceback: Optional[types.TracebackType]) -> bool:
+        assert self._interrupt_handler is not None
+        self._interrupt_handler.stop()
+
         try:
             if self._async_pager is not None:
-                if self._interrupt_task is not None:
-                    self._interrupt_task.cancel()
-
                 try:
                     await self._async_pager.stdin_close()
                 except BrokenPipeError:
@@ -304,10 +279,7 @@ class AutoPager:
                 self._flush_output()
             return self._process_exception(exc)
         finally:
-            if (self._old_int_handler is not None
-                    and signal.getsignal(signal.SIGINT) is not None):
-                signal.signal(signal.SIGINT, self._old_int_handler)
-                self._old_int_handler = None
+            await self._interrupt_handler.remove()
 
     def _flush_output(self) -> None:
         try:
@@ -326,7 +298,7 @@ class AutoPager:
         if exc is not None:
             if isinstance(exc, asyncio.CancelledError):
                 reason = str(exc)
-                if reason == _SIGINT_CANCEL_MSG:
+                if reason == async_subprocess.SIGINT_CANCEL_MSG:
                     self._exit_code = _SIGNAL_EXIT_BASE + int(signal.SIGINT)
                     return True
                 elif reason == async_subprocess.SUBPROCESS_EXITED_CANCEL_MSG:

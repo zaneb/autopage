@@ -13,6 +13,7 @@
 import asyncio
 import codecs
 import os
+import signal
 import sys
 
 import types
@@ -23,9 +24,11 @@ from typing import IO, Mapping, Sequence, Generator
 
 _Arg = Union[str, bytes, os.PathLike]
 _File = Union[int, IO[Any]]
+_SignalHandler = typing.Callable[[signal.Signals, types.FrameType], Any]
 
 
 SUBPROCESS_EXITED_CANCEL_MSG = "Subprocess exited"
+SIGINT_CANCEL_MSG = 'SIGINT received'
 
 
 class _AsyncProcess:
@@ -181,4 +184,79 @@ class AsyncPopen:
         return False
 
 
-__all__ = ['AsyncPopen']
+class InterruptHandler:
+    def __init__(self) -> None:
+        self.interrupt_received = asyncio.Event()
+        self._old_int_handler: typing.Union[_SignalHandler, int,
+                                            signal.Handlers, None] = None
+        self._interrupt_task: Optional[asyncio.Task] = None
+
+    async def _cancel_task_on_interrupt(self, task: asyncio.Task) -> None:
+        await self.interrupt_received.wait()
+        if not task.done():
+            task.cancel(SIGINT_CANCEL_MSG)
+
+    async def _interrupt_handler(self) -> _SignalHandler:
+        loop = asyncio.get_running_loop()
+        task = asyncio.current_task(loop)
+        assert task is not None
+
+        cancel = self._cancel_task_on_interrupt(task)
+        self._interrupt_task = loop.create_task(cancel)
+
+        def handle_interrupt(signum: signal.Signals,
+                             frame: types.FrameType) -> None:
+            self.interrupt_received.set()
+
+        return handle_interrupt
+
+    async def install(self) -> "InterruptHandler":
+        if self._old_int_handler is not None:
+            return self
+
+        self._old_int_handler = signal.signal(signal.SIGINT,
+                                              await self._interrupt_handler())
+        return self
+
+    def __await__(self) -> Generator[Any, None, "InterruptHandler"]:
+        return self.install().__await__()
+
+    async def __aenter__(self) -> "InterruptHandler":
+        return await self
+
+    def stop(self) -> None:
+        if self._interrupt_task is not None:
+            self._interrupt_task.cancel()
+            self._interrupt_task = None
+
+    async def remove(self) -> None:
+        self.stop()
+
+        if self._old_int_handler is None:
+            return
+
+        if signal.getsignal(signal.SIGINT) is None:
+            # If this is called from a finalizer during interpreter shutdown,
+            # CPython will have removed the definition of SIG_IGN, so we can't
+            # set the signal handler back to anything. We can detect this by
+            # checking for None returned from getsignal()
+            return
+
+        signal.signal(signal.SIGINT, self._old_int_handler)
+        self._old_int_handler = None
+
+    async def __aexit__(self,
+                        exc_type: Optional[Type[BaseException]],
+                        exc: Optional[BaseException],
+                        traceback: Optional[types.TracebackType]) -> bool:
+        await self.remove()
+        return False
+
+    def clear_interrupt(self) -> None:
+        self.interrupt_received.clear()
+
+    async def wait_interrupt(self) -> None:
+        await self.interrupt_received.wait()
+
+
+__all__ = ['AsyncPopen', 'InterruptHandler']
