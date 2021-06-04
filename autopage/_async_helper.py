@@ -31,6 +31,22 @@ SUBPROCESS_EXITED_CANCEL_MSG = "Subprocess exited"
 SIGINT_CANCEL_MSG = 'SIGINT received'
 
 
+def _get_loop() -> asyncio.AbstractEventLoop:
+    if sys.version_info >= (3, 7):
+        return asyncio.get_running_loop()
+
+    return asyncio.get_event_loop()
+
+
+def _current_task(loop: asyncio.AbstractEventLoop) -> asyncio.Task:
+    if sys.version_info >= (3, 7):
+        task = asyncio.current_task(loop)
+    else:
+        task = asyncio.Task.current_task(loop)
+    assert task is not None
+    return task
+
+
 def _create_task(loop: asyncio.AbstractEventLoop,
                  coro: typing.Coroutine[Any, None, Any]) -> asyncio.Task:
     if sys.version_info >= (3, 7):
@@ -165,9 +181,8 @@ class AsyncPopen:
             await process.wait()
             task.cancel(SUBPROCESS_EXITED_CANCEL_MSG)
 
-        loop = asyncio.get_running_loop()
-        current_task = asyncio.current_task(loop)
-        assert current_task is not None
+        loop = _get_loop()
+        current_task = _current_task(loop)
         cleanup = _create_task(loop, handle_exit(subproc, current_task))
 
         return _AsyncProcess(subproc, cleanup,
@@ -206,8 +221,8 @@ class InterruptHandler:
             task.cancel(SIGINT_CANCEL_MSG)
 
     async def _interrupt_handler(self) -> _SignalHandler:
-        loop = asyncio.get_running_loop()
-        task = asyncio.current_task(loop)
+        loop = _get_loop()
+        task = _current_task(loop)
         assert task is not None
 
         cancel = self._cancel_task_on_interrupt(task)
