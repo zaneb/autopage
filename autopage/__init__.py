@@ -35,6 +35,7 @@ from typing import Any, Optional, Type, Dict, List, TextIO
 _SignalHandler = typing.Callable[[signal.Signals, types.FrameType], Any]
 
 _SIGNAL_EXIT_BASE = 128
+_SIGINT_CANCEL_MSG = 'SIGINT received'
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
 
@@ -230,7 +231,7 @@ class AutoPager:
         def handle_interrupt(signum: signal.Signals,
                              frame: types.FrameType) -> None:
             if task is not None and not task.done():
-                task.cancel('SIGINT received')
+                task.cancel(_SIGINT_CANCEL_MSG)
 
         return handle_interrupt
 
@@ -312,16 +313,25 @@ class AutoPager:
 
     def _process_exception(self, exc: Optional[BaseException]) -> bool:
         if exc is not None:
-            if isinstance(exc, (BrokenPipeError, asyncio.CancelledError)):
-                # Exit code for SIGPIPE
-                self._exit_code = _SIGNAL_EXIT_BASE + 13
+            if isinstance(exc, asyncio.CancelledError):
+                reason = str(exc)
+                if reason == _SIGINT_CANCEL_MSG:
+                    self._exit_code = _SIGNAL_EXIT_BASE + int(signal.SIGINT)
+                    return True
+                elif reason == async_subprocess.SUBPROCESS_EXITED_CANCEL_MSG:
+                    self._exit_code = _SIGNAL_EXIT_BASE + int(signal.SIGPIPE)
+                    return True
+                else:
+                    self._exit_code = 1
+                    return False
+            elif isinstance(exc, BrokenPipeError):
+                self._exit_code = _SIGNAL_EXIT_BASE + int(signal.SIGPIPE)
                 # Suppress exceptions caused by a broken pipe (indicating that
                 # the user has exited the pager, or the following process in
                 # the pipeline has exited)
                 return True
             elif isinstance(exc, KeyboardInterrupt):
-                # Exit code for SIGINT
-                self._exit_code = _SIGNAL_EXIT_BASE + 2
+                self._exit_code = _SIGNAL_EXIT_BASE + int(signal.SIGINT)
             elif isinstance(exc, SystemExit):
                 self._exit_code = exc.code
             else:

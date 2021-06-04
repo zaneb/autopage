@@ -25,6 +25,9 @@ _Arg = Union[str, bytes, os.PathLike]
 _File = Union[int, IO[Any]]
 
 
+SUBPROCESS_EXITED_CANCEL_MSG = "Subprocess exited"
+
+
 class _AsyncProcess:
     def __init__(self,
                  proc: asyncio.subprocess.Process,
@@ -148,7 +151,7 @@ class AsyncPopen:
         async def handle_exit(process: asyncio.subprocess.Process,
                               task: asyncio.Task) -> None:
             await process.wait()
-            task.cancel('Subprocess exited')
+            task.cancel(SUBPROCESS_EXITED_CANCEL_MSG)
 
         loop = asyncio.get_running_loop()
         current_task = asyncio.current_task(loop)
