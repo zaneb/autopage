@@ -268,7 +268,7 @@ class AutoPager:
         try:
             if self._async_pager is not None:
                 try:
-                    await self._async_pager.stdin_close()
+                    await asyncio.shield(self._async_pager.stdin_close())
                 except BrokenPipeError:
                     # Other end of pipe already closed
                     pass
@@ -279,7 +279,7 @@ class AutoPager:
                 self._flush_output()
             return self._process_exception(exc)
         finally:
-            await self._interrupt_handler.remove()
+            await asyncio.shield(self._interrupt_handler.remove())
 
     def _flush_output(self) -> None:
         try:
