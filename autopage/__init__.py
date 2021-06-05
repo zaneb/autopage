@@ -21,6 +21,7 @@ By Zane Bitter.
 import enum
 import io
 import os
+import signal
 import subprocess
 import sys
 
@@ -28,8 +29,6 @@ import types
 import typing
 from typing import Any, Optional, Type, Dict, List, TextIO
 
-
-_SIGNAL_EXIT_BASE = 128
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
 
@@ -242,15 +241,13 @@ class AutoPager:
     def _process_exception(self, exc: Optional[BaseException]) -> bool:
         if exc is not None:
             if isinstance(exc, BrokenPipeError):
-                # Exit code for SIGPIPE
-                self._exit_code = _SIGNAL_EXIT_BASE + 13
+                self._exit_code = _signal_exit_code(signal.SIGPIPE)
                 # Suppress exceptions caused by a broken pipe (indicating that
                 # the user has exited the pager, or the following process in
                 # the pipeline has exited)
                 return True
             elif isinstance(exc, KeyboardInterrupt):
-                # Exit code for SIGINT
-                self._exit_code = _SIGNAL_EXIT_BASE + 2
+                self._exit_code = _signal_exit_code(signal.SIGINT)
             elif isinstance(exc, SystemExit):
                 self._exit_code = exc.code
             else:
@@ -291,3 +288,13 @@ def line_buffer_from_input(input_stream: Optional[typing.IO] = None) -> bool:
     if input_stream is None:
         input_stream = sys.stdin
     return not input_stream.seekable()
+
+
+def _signal_exit_code(signum: signal.Signals) -> int:
+    """
+    Return the exit code corresponding to a received signal.
+
+    Conventionally, when a program exits due to a signal its exit code is 128
+    plus the signal number.
+    """
+    return 128 + int(signum)
