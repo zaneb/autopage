@@ -18,6 +18,7 @@ A library to provide automatic paging for console output.
 By Zane Bitter.
 """
 
+import contextlib
 import enum
 import io
 import os
@@ -207,20 +208,15 @@ class AutoPager:
                  exc: Optional[BaseException],
                  traceback: Optional[types.TracebackType]) -> bool:
         if self._pager is not None:
-            try:
-                typing.cast(TextIO, self._pager.stdin).close()
-            except BrokenPipeError:
-                # Other end of pipe already closed
-                self._exit_code = _signal_exit_code(signal.SIGPIPE)
-            # Wait for user to exit pager
-            while True:
+            # Pager ignores Ctrl-C, so we should too
+            with _sigint_ignore():
                 try:
-                    self._pager.wait()
-                except KeyboardInterrupt:
-                    # Pager ignores Ctrl-C, so we should too
-                    continue
-                else:
-                    break
+                    typing.cast(TextIO, self._pager.stdin).close()
+                except BrokenPipeError:
+                    # Other end of pipe already closed
+                    self._exit_code = _signal_exit_code(signal.SIGPIPE)
+                # Wait for user to exit pager
+                self._pager.wait()
         else:
             self._flush_output()
         return self._process_exception(exc)
@@ -301,3 +297,21 @@ def _signal_exit_code(signum: signal.Signals) -> int:
     plus the signal number.
     """
     return 128 + int(signum)
+
+
+@contextlib.contextmanager
+def _sigint_ignore() -> typing.Generator[None, None, None]:
+    """
+    Context manager to temporarily ignore SIGINT.
+    """
+    old_int_handler: Any = None
+    try:
+        old_int_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        yield
+    finally:
+        # If this is called from a finalizer during interpreter shutdown,
+        # CPython will have removed the definition of SIG_IGN, so we can't
+        # set the signal handler back to anything. We can detect this by
+        # checking for None returned from getsignal()
+        if signal.getsignal(signal.SIGINT) is not None:
+            signal.signal(signal.SIGINT, old_int_handler)
