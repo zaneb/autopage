@@ -179,6 +179,25 @@ class ExitCodeTest(fixtures.TestWithFixtures):
             pass
         self.assertEqual(0, self.ap.exit_code())
 
+    def test_pager_broken_pipe_flush(self):
+        flush = mock.MagicMock(side_effect=BrokenPipeError)
+        with sinks.TTYFixture() as out:
+            ap = autopage.AutoPager(out.stream)
+            with fixtures.MockPatch('subprocess.Popen') as popen:
+                with sinks.BufferFixture() as pager_in:
+                    popen.mock.return_value.stdin = pager_in.stream
+                    with ap as stream:
+                        stream.write('foo')
+                        stream.close = flush
+            self.assertEqual(141, ap.exit_code())
+
+    def test_no_pager_broken_pipe_flush(self):
+        flush = mock.MagicMock(side_effect=BrokenPipeError)
+        with self.ap as stream:
+            stream.write('foo')
+            stream.flush = flush
+        self.assertEqual(141, self.ap.exit_code())
+
     def test_broken_pipe(self):
         with self.ap:
             raise BrokenPipeError
@@ -230,7 +249,6 @@ class CleanupTest(unittest.TestCase):
             with autopage.AutoPager(out.stream) as stream:
                 stream.flush = flush
                 stream.write('foo')
-                pass
             self.assertFalse(out.stream.closed)
         flush.assert_called_once()
 
@@ -240,7 +258,15 @@ class CleanupTest(unittest.TestCase):
             with autopage.AutoPager(out.stream) as stream:
                 stream.flush = flush
                 stream.write('foo')
-                pass
+            self.assertTrue(out.stream.closed)
+        flush.assert_called_once()
+
+    def test_no_pager_broken_pipe_flush(self):
+        flush = mock.MagicMock(side_effect=BrokenPipeError)
+        with sinks.BufferFixture() as out:
+            with autopage.AutoPager(out.stream) as stream:
+                stream.write('foo')
+                stream.flush = flush
             self.assertTrue(out.stream.closed)
         flush.assert_called_once()
 

@@ -211,7 +211,7 @@ class AutoPager:
                 typing.cast(TextIO, self._pager.stdin).close()
             except BrokenPipeError:
                 # Other end of pipe already closed
-                pass
+                self._exit_code = _signal_exit_code(signal.SIGPIPE)
             # Wait for user to exit pager
             while True:
                 try:
@@ -230,6 +230,7 @@ class AutoPager:
             if not self._out.closed:
                 self._out.flush()
         except BrokenPipeError:
+            self._exit_code = _signal_exit_code(signal.SIGPIPE)
             try:
                 # Other end of pipe already closed, so close the stream now
                 # and handle the error.
