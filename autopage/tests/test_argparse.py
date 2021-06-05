@@ -33,7 +33,8 @@ class ArgumentParseTest(fixtures.TestWithFixtures):
         except SystemExit as exit:
             self.assertIs(self.pager.return_value.exit_code.return_value,
                           exit.code)
-        self.pager.assert_called_once_with(allow_color=True,
+        self.pager.assert_called_once_with(None,
+                                           allow_color=True,
                                            line_buffering=False,
                                            reset_on_exit=False)
         self.pager.return_value.__enter__.assert_called_once()
