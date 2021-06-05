@@ -62,7 +62,7 @@ class AutoPager:
                  errors: Optional[ErrorStrategy] = None):
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
-        self._tty = self._out.isatty()
+        self._tty = (not self._out.closed) and self._out.isatty()
         self._color = allow_color
         self._reset = reset_on_exit
         self._set_line_buffering = line_buffering
