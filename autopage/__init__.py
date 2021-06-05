@@ -233,7 +233,9 @@ class AutoPager:
             self._exit_code = _signal_exit_code(signal.SIGPIPE)
             try:
                 # Other end of pipe already closed, so close the stream now
-                # and handle the error.
+                # and handle the error. If we leave the stream open with
+                # unflushed data, then it will print an unhandleable
+                # exception during Python's interpreter shutdown.
                 self._out.close()
             except BrokenPipeError:
                 # This will always happen
