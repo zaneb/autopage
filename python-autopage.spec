@@ -8,14 +8,13 @@
 %endif
 
 Name:           python-%{srcname}
-Version:        0.3.0
-Release:        2%{?dist}
+Version:        0.3.1
+Release:        1%{?dist}
 Summary:        A Python library to provide automatic paging for console output
 License:        ASL 2.0
 URL:            https://pypi.python.org/pypi/autopage
 Source0:        %{pypi_source}
-Source1:        https://raw.githubusercontent.com/zaneb/%{srcname}/v%{version}/tox.ini
-Source2:        setup.py
+Source1:        setup.py
 
 BuildArch:      noarch
 
@@ -31,20 +30,19 @@ BuildRequires:  python3-devel
 %if %{with pyproject}
 BuildRequires:  pyproject-rpm-macros
 %else
-BuildRequires:  %{py3_dist fixtures} < 4.0
+BuildRequires:  %{py3_dist fixtures}
 %endif
 
 %description -n python3-%{srcname} %_description
 
 %prep
 %autosetup -n %{srcname}-%{version}
-cp %{SOURCE1} ./
 
 %if %{with pyproject}
 %generate_buildrequires
 %pyproject_buildrequires -e pep8,%{toxenv}
 %else
-cp %{SOURCE2} ./
+cp %{SOURCE1} ./
 %endif
 
 %build
@@ -80,6 +78,9 @@ cp %{SOURCE2} ./
 %doc README.md
 
 %changelog
+* Fri Jun 25 2021 Zane Bitter <zaneb@fedoraproject.org> 0.3.1-1
+- Update to v0.3.1 for easier packaging
+
 * Fri Jun 25 2021 Zane Bitter <zaneb@fedoraproject.org> 0.3.0-2
 - Support building for EPEL
 
