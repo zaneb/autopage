@@ -27,6 +27,14 @@ with `pip`:
 
     $ pip install autopage
 
+### On Fedora and CentOS/RHEL
+
+Copr repositories are available for Fedora and EPEL. The library can be
+installed by first enabling the repository:
+
+    # dnf copr enable zaneb/autopage
+    # dnf install python3-autopage
+
 ## Basic Use
 
 The `AutoPager` class provides a context manager that furnishes the output
