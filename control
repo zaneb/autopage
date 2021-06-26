@@ -1,0 +1,31 @@
+Source: python-autopage
+Maintainer: Zane Bitter <zaneb@fedoraproject.org>
+Homepage: https://github.com/zaneb/autopage
+Section: python
+Priority: optional
+Standards-Version: 4.5.0
+Build-Depends: debhelper (>= 12),
+    dh-python,
+    python3-all,
+    python3-setuptools,
+    python3-fixtures,
+X-Python3-Version: >= 3.6
+Testsuite: autopkgtest-pkg-python
+Rules-Requires-Root: no
+
+Package: python3-autopage
+Architecture: all
+Section: python
+Priority: optional
+Depends: ${python3:Depends}, ${misc:Depends}
+Description: Python 3 library to provide automatic paging of console output.
+ Autopage is a Python library to automatically display terminal output from a
+ program in a pager (like `less`) whenever you need it, and never when you
+ don't. And it only takes one line of code.
+ .
+ You know how some CLI programs like `git` (and a handful of others,
+ including `man` and `systemctl`) automatically pipe their output to `less`?
+ Except not if there's less than one screen's worth of data. And if you
+ redirect the output to a file or a pipe, it does the right thing instead.
+ Colours are preserved. Don't you wish all programs worked like that?
+ Now at least all of your Python programs can.

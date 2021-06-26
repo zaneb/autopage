@@ -1,0 +1,5 @@
+.pybuild
+files
+.debhelper
+debhelper-build-stamp
+python3-autopage*
