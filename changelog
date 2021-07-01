@@ -1,5 +1,5 @@
-python-autopage (0.3.1-1) UNRELEASED; urgency=low
+python-autopage (0.3.1-1) groovy; urgency=low
 
   * Initial release.
 
- -- Zane Bitter <zaneb@fedoraproject.org>  Fri, 25 Jun 2021 21:42:24 -0400
+ -- Zane Bitter <zaneb@fedoraproject.org>  Wed, 30 Jun 2021 23:00:34 -0400
