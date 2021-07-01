@@ -35,6 +35,15 @@ installed by first enabling the repository:
     # dnf copr enable zaneb/autopage
     # dnf install python3-autopage
 
+### On Ubuntu
+
+A PPA is available for Ubuntu. The library can be installed by first enabling
+the PPA:
+
+    # add-apt-repository ppa:zaneb/autopage
+    # apt-get update
+    # apt-get install python3-autopage
+
 ## Basic Use
 
 The `AutoPager` class provides a context manager that furnishes the output
