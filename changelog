@@ -1,3 +1,9 @@
+python-autopage (0.4.0-1) groovy; urgency=low
+
+  * Update to v0.4.0 to add public API to set color mode of ArgumentParser.
+
+ -- Zane Bitter <zaneb@fedoraproject.org>  Mon, 12 Jul 2021 21:35:47 -0400
+
 python-autopage (0.3.1-1) groovy; urgency=low
 
   * Initial release.
