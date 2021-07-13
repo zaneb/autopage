@@ -43,6 +43,8 @@ from argparse import *  # noqa
 
 _HelpFormatter = argparse.HelpFormatter
 
+_color_attr = '_color'
+
 
 def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
     """Return an AutoPager suitable for help output."""
@@ -58,7 +60,7 @@ class ColorHelpFormatter(_HelpFormatter):
         def heading(self) -> Optional[Text]:
             if (not self._heading
                     or self._heading == argparse.SUPPRESS
-                    or not getattr(self.formatter, '_color', False)):
+                    or not getattr(self.formatter, _color_attr, False)):
                 return self._heading
             return f'\033[4m{self._heading}\033[0m'
 
@@ -71,7 +73,7 @@ class ColorHelpFormatter(_HelpFormatter):
                            default_metavar: Text) -> Callable[[int],
                                                               Tuple[str, ...]]:
         get_metavars = super()._metavar_formatter(action, default_metavar)
-        if not getattr(self, '_color', False):
+        if not getattr(self, _color_attr, False):
             return get_metavars
 
         def color_metavar(size: int) -> Tuple[str, ...]:
@@ -120,7 +122,7 @@ class _HelpAction(argparse._HelpAction):
                  option_string: Optional[Text] = None) -> None:
         pager = help_pager()
         with pager as out:
-            setattr(parser, '_color', pager.to_terminal())
+            setattr(parser, _color_attr, pager.to_terminal())
             parser.print_help(out)
         parser.exit(pager.exit_code())
 
@@ -139,7 +141,8 @@ def _substitute_formatter(
             parser.formatter_class = ColorHelpFormatter
         formatter = get_fmtr(parser)
         if isinstance(formatter, ColorHelpFormatter):
-            setattr(formatter, '_color', getattr(parser, '_color', False))
+            setattr(formatter, _color_attr,
+                    getattr(parser, _color_attr, False))
         return formatter
     return _get_formatter
 
