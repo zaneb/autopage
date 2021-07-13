@@ -54,6 +54,12 @@ def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
                               reset_on_exit=False)
 
 
+def use_color_for_parser(parser: argparse.ArgumentParser,
+                         color: bool) -> None:
+    """Configure a parser whether to output in color from HelpFormatters."""
+    setattr(parser, _color_attr, color)
+
+
 class ColorHelpFormatter(_HelpFormatter):
     class _Section(_HelpFormatter._Section):  # type: ignore
         @property
@@ -122,7 +128,7 @@ class _HelpAction(argparse._HelpAction):
                  option_string: Optional[Text] = None) -> None:
         pager = help_pager()
         with pager as out:
-            setattr(parser, _color_attr, pager.to_terminal())
+            use_color_for_parser(parser, pager.to_terminal())
             parser.print_help(out)
         parser.exit(pager.exit_code())
 
@@ -209,4 +215,6 @@ def monkey_patch() -> ContextManager:
     return unpatcher()
 
 
-__all__ = argparse.__all__ + ['monkey_patch']  # type: ignore
+__all__ = argparse.__all__ + [  # type: ignore
+        'use_color_for_parser', 'monkey_patch'
+    ]
