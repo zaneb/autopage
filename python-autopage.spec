@@ -8,7 +8,7 @@
 %endif
 
 Name:           python-%{srcname}
-Version:        0.3.1
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        A Python library to provide automatic paging for console output
 License:        ASL 2.0
@@ -78,6 +78,9 @@ cp %{SOURCE1} ./
 %doc README.md
 
 %changelog
+* Mon Jul 12 2021 Zane Bitter <zaneb@fedoraproject.org> 0.4.0-1
+- Update to v0.4.0
+
 * Fri Jun 25 2021 Zane Bitter <zaneb@fedoraproject.org> 0.3.1-1
 - Update to v0.3.1 for easier packaging
 
