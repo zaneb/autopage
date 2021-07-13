@@ -43,7 +43,7 @@ from argparse import *  # noqa
 
 _HelpFormatter = argparse.HelpFormatter
 
-_color_attr = '_color'
+_color_attr = '_autopage_color'
 
 
 def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
