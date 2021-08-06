@@ -213,7 +213,7 @@ class PlatformTest(unittest.TestCase):
     def test_win32_cmd(self):
         with PlatformFixture('win32'):
             cmd = command.PlatformPager()
-            self.assertEqual(['less'], cmd.command())
+            self.assertEqual(['more.com'], cmd.command())
 
     def test_cygwin_cmd(self):
         with PlatformFixture('cygwin'):

@@ -85,7 +85,7 @@ To disable this behaviour, pass
 `pager_command=autopage.command.PlatformPager()` to use the default pager for
 the current platform, or pass a specific pager from `autopage.commands`. The
 default pager command is `less` on most platforms. On AIX the default pager
-command is `more`.
+command is `more`, and on Windows `more.com`.
 
 The end user can also override the settings for `less` by setting the `LESS`
 environment variable. If not specified, the settings are determined by the

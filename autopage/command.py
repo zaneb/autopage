@@ -52,6 +52,8 @@ class More(PagerCommand):
     """The pager command ``more``."""
 
     def command(self) -> List[str]:
+        if sys.platform.startswith('win32'):
+            return ['more.com']
         return ['more']
 
     def environment_variables(self,
@@ -134,6 +136,8 @@ def PlatformPager() -> PagerCommand:
     Return the default pager command for the current platform.
     """
     if sys.platform.startswith('aix'):
+        return More()
+    if sys.platform.startswith('win32'):
         return More()
     return Less()
 
