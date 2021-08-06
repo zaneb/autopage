@@ -11,6 +11,7 @@
 #   under the License.
 
 import unittest
+import sys
 
 import fixtures
 
@@ -184,7 +185,52 @@ class DefaultTest(LessTest, LVTest):
                          cmd.command())
 
 
+class PlatformFixture(fixtures.Fixture):
+    def __init__(self, platform):
+        self.platform = platform
+
+    def _setUp(self):
+        self.addCleanup(setattr, sys, 'platform', sys.platform)
+        sys.platform = self.platform
+
+
 class PlatformTest(unittest.TestCase):
-    def test_cmd(self):
-        cmd = command.PlatformPager()
-        self.assertEqual(['less'], cmd.command())
+    def test_aix_cmd(self):
+        with PlatformFixture('aix'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+        # Prior to Python 3.8, the version number was included
+        with PlatformFixture('aix7'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_linux_cmd(self):
+        with PlatformFixture('linux'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_win32_cmd(self):
+        with PlatformFixture('win32'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_cygwin_cmd(self):
+        with PlatformFixture('cygwin'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_macos_cmd(self):
+        with PlatformFixture('darwin'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_sunos_cmd(self):
+        with PlatformFixture('sunos5'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
+
+    def test_freebsd_cmd(self):
+        with PlatformFixture('freebsd8'):
+            cmd = command.PlatformPager()
+            self.assertEqual(['less'], cmd.command())
