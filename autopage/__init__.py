@@ -83,7 +83,7 @@ class AutoPager:
     def __enter__(self) -> TextIO:
         # Only invoke the pager if the output is going to a tty; if it is
         # being sent to a file or pipe then we don't want the pager involved
-        if self.to_terminal():
+        if self.to_terminal() and self._command.command() != ['cat']:
             try:
                 return self._paged_stream()
             except OSError:
