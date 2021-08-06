@@ -18,72 +18,55 @@ import autopage
 from autopage import command
 
 
-class EnvironmentTest(unittest.TestCase):
-    def test_less_defaults(self):
-        ap = autopage.AutoPager(pager_command=command.Less())
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('RFX', less_env)
+class ConfigTest(unittest.TestCase):
+    def setUp(self):
+        class TestCommand(command.PagerCommand):
+            def __init__(self):
+                self.config = None
 
-    def test_less_nocolour(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                allow_color=False)
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('FX', less_env)
+            def command(self):
+                return []
 
-    def test_less_reset(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                reset_on_exit=True)
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('R', less_env)
+            def environment_variables(self, config):
+                self.config = config
+                return None
 
-    def test_less_linebuffered(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                line_buffering=True)
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('RX', less_env)
+        self.test_command = TestCommand()
 
-    def test_less_linebuffered_reset(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                line_buffering=True,
-                                reset_on_exit=True)
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('R', less_env)
+    def _get_ap_config(self, **args):
+        ap = autopage.AutoPager(pager_command=self.test_command, **args)
+        ap._pager_env()
+        return self.test_command.config
 
-    def test_less_linebuffered_nocolor(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                line_buffering=True,
-                                allow_color=False)
-        less_env = ap._pager_env()['LESS']
-        self.assertEqual('X', less_env)
+    def test_defaults(self):
+        config = self._get_ap_config()
+        self.assertTrue(config.color)
+        self.assertFalse(config.line_buffering_requested)
+        self.assertFalse(config.reset_terminal)
 
-    def test_less_linebuffered_nocolor_reset(self):
-        ap = autopage.AutoPager(pager_command=command.Less(),
-                                line_buffering=True,
-                                allow_color=False,
-                                reset_on_exit=True)
-        self.assertNotIn('LESS', ap._pager_env())
+    def test_nocolor(self):
+        config = self._get_ap_config(allow_color=False)
+        self.assertFalse(config.color)
+        self.assertFalse(config.line_buffering_requested)
+        self.assertFalse(config.reset_terminal)
 
-    def test_less_user_override(self):
-        ap = autopage.AutoPager(pager_command=command.Less())
-        with fixtures.EnvironmentVariable('LESS', 'abc'):
-            env = ap._pager_env()
-        self.assertEqual('abc', env['LESS'])
+    def test_reset(self):
+        config = self._get_ap_config(reset_on_exit=True)
+        self.assertTrue(config.color)
+        self.assertFalse(config.line_buffering_requested)
+        self.assertTrue(config.reset_terminal)
 
-    def test_lv_defaults(self):
-        ap = autopage.AutoPager(pager_command=command.LV())
-        lv_env = ap._pager_env()['LV']
-        self.assertEqual('-c', lv_env)
+    def test_linebuffered(self):
+        config = self._get_ap_config(line_buffering=True)
+        self.assertTrue(config.color)
+        self.assertTrue(config.line_buffering_requested)
+        self.assertFalse(config.reset_terminal)
 
-    def test_lv_nocolour(self):
-        ap = autopage.AutoPager(pager_command=command.LV(),
-                                allow_color=False)
-        self.assertNotIn('LV', ap._pager_env())
-
-    def test_lv_user_override(self):
-        ap = autopage.AutoPager(pager_command=command.LV())
-        with fixtures.EnvironmentVariable('LV', 'abc'):
-            env = ap._pager_env()
-        self.assertEqual('abc', env['LV'])
+    def test_not_linebuffered(self):
+        config = self._get_ap_config(line_buffering=False)
+        self.assertTrue(config.color)
+        self.assertFalse(config.line_buffering_requested)
+        self.assertFalse(config.reset_terminal)
 
 
 class EnvironmentBuildTest(unittest.TestCase):
