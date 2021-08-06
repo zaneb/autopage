@@ -93,11 +93,11 @@ class EnvironmentBuildTest(unittest.TestCase):
         ap = autopage.AutoPager(pager_command=cmd)
         with fixtures.EnvironmentVariable('BAZ', 'quux'):
             env = ap._pager_env()
-        self.assertEqual('quux', env['BAZ'])
+        self.assertIsNone(env)
 
     def test_env_none(self):
         cmd = self.TestCommand(None)
         ap = autopage.AutoPager(pager_command=cmd)
         with fixtures.EnvironmentVariable('BAZ', 'quux'):
             env = ap._pager_env()
-        self.assertEqual('quux', env['BAZ'])
+        self.assertIsNone(env)

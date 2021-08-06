@@ -148,9 +148,11 @@ class AutoPager:
 
     def _pager_env(self) -> Optional[Dict[str, str]]:
         new_vars = self._command.environment_variables(self._config)
+        if not new_vars:
+            return None
 
         env = dict(os.environ)
-        env.update(new_vars or {})
+        env.update(new_vars)
         return env
 
     def _pager_out_stream(self) -> Optional[TextIO]:
