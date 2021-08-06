@@ -79,8 +79,12 @@ can also be used as a context manager.
 
 ## Environment
 
-The end user can override the pager command by setting the `PAGER` environment
-variable. The default command is `less`.
+The default pager command (`autopage.command.DefaultPager()`) allows the end
+user to override the pager command by setting the `PAGER` environment variable.
+To disable this behaviour, pass
+`pager_command=autopage.command.PlatformPager()` to use the default pager for
+the current platform, or pass a specific pager from `autopage.commands`. The
+default pager command is `less`.
 
 The end user can also override the settings for `less` by setting the `LESS`
 environment variable. If not specified, the settings are determined by the

@@ -28,6 +28,8 @@ import types
 import typing
 from typing import Any, Optional, Type, Dict, List, TextIO
 
+from autopage import command
+
 
 __all__ = ['AutoPager', 'line_buffer_from_input']
 
@@ -54,6 +56,7 @@ class AutoPager:
 
     def __init__(self,
                  output_stream: Optional[TextIO] = None, *,
+                 pager_command: command.PagerCommand = command.DefaultPager(),
                  allow_color: bool = True,
                  line_buffering: Optional[bool] = None,
                  reset_on_exit: bool = False,
@@ -61,8 +64,12 @@ class AutoPager:
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = (not self._out.closed) and self._out.isatty()
-        self._color = allow_color
-        self._reset = reset_on_exit
+        self._command = pager_command
+        self._config = command.PagerConfig(
+                color=allow_color,
+                line_buffering_requested=bool(line_buffering),
+                reset_terminal=reset_on_exit,
+            )
         self._set_line_buffering = line_buffering
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
@@ -140,41 +147,13 @@ class AutoPager:
                         sys.stdout = self._out
 
     def _pager_cmd(self) -> List[str]:
-        pager = os.getenv('PAGER')
-        if pager is not None:
-            import shlex
-            return shlex.split(pager)
-        return ['less']
+        return self._command.command()
 
     def _pager_env(self) -> Optional[Dict[str, str]]:
-        less_flags = []
-        lv_flags = []
-        if self._color:
-            # This option will cause less to output ANSI color escape sequences
-            # in raw form.
-            # Equivalent to the --RAW-CONTROL-CHARS argument
-            less_flags.append('R')
-            # This option allows ANSI color escape sequences in lv
-            lv_flags.append('-c')
-        if not self._set_line_buffering and not self._reset:
-            # This option will cause less to buffer until an entire screen's
-            # worth of data is available (or the EOF is reached), so don't
-            # enable it when line buffering is explicitly requested. It also
-            # does not reset the terminal after exiting, so don't enable it
-            # when resetting the terminal is requested.
-            # Equivalent to the --quit-if-one-screen argument
-            less_flags.append('F')
-        if not self._reset:
-            # This option will cause less to not reset the terminal after
-            # exiting.
-            # Equivalent to the --no-init argument
-            less_flags.append('X')
+        new_vars = self._command.environment_variables(self._config)
 
         env = dict(os.environ)
-        if less_flags and (os.getenv('LESS') is None):
-            env['LESS'] = ''.join(less_flags)
-        if lv_flags and (os.getenv('LV') is None):
-            env['LV'] = ' '.join(lv_flags)
+        env.update(new_vars or {})
         return env
 
     def _pager_out_stream(self) -> Optional[TextIO]:
