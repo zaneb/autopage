@@ -18,21 +18,6 @@ import autopage
 from autopage import command
 
 
-class CommandTest(unittest.TestCase):
-    def test_cmd_default(self):
-        with fixtures.EnvironmentVariable('PAGER'):
-            def_cmd = command.DefaultPager()
-        ap = autopage.AutoPager(pager_command=def_cmd)
-        self.assertListEqual(['less'], ap._pager_cmd())
-
-    def test_cmd_override(self):
-        with fixtures.EnvironmentVariable('PAGER', 'less "-r" +F'):
-            def_cmd = command.DefaultPager()
-        ap = autopage.AutoPager(pager_command=def_cmd)
-        cmd = ap._pager_cmd()
-        self.assertListEqual(['less', '-r', '+F'], cmd)
-
-
 class EnvironmentTest(unittest.TestCase):
     def test_less_defaults(self):
         ap = autopage.AutoPager(pager_command=command.Less())

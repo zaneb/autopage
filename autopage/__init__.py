@@ -26,7 +26,7 @@ import sys
 
 import types
 import typing
-from typing import Any, Optional, Type, Dict, List, TextIO
+from typing import Any, Optional, Type, Dict, TextIO
 
 from autopage import command
 
@@ -146,9 +146,6 @@ class AutoPager:
                     if self._use_stdout:
                         sys.stdout = self._out
 
-    def _pager_cmd(self) -> List[str]:
-        return self._command.command()
-
     def _pager_env(self) -> Optional[Dict[str, str]]:
         new_vars = self._command.environment_variables(self._config)
 
@@ -169,7 +166,7 @@ class AutoPager:
 
     def _paged_stream(self) -> TextIO:
         buffer_size = 1 if self._line_buffering() else -1
-        self._pager = subprocess.Popen(self._pager_cmd(),
+        self._pager = subprocess.Popen(self._command.command(),
                                        env=self._pager_env(),
                                        bufsize=buffer_size,
                                        universal_newlines=True,

@@ -20,6 +20,7 @@ import fixtures
 from autopage.tests import sinks
 
 import autopage
+from autopage import command
 
 
 class PagedStreamTest(fixtures.TestWithFixtures):
@@ -33,9 +34,17 @@ class PagedStreamTest(fixtures.TestWithFixtures):
         self.popen = popen.mock
 
     def test_defaults(self):
-        ap = autopage.AutoPager(line_buffering=False)
+        class TestCommand(command.PagerCommand):
+            def command(self):
+                return []
+
+            def environment_variables(self, config):
+                return None
+
+        tc = TestCommand()
+        ap = autopage.AutoPager(pager_command=tc, line_buffering=False)
         with mock.patch.object(ap, '_pager_env') as get_env, \
-                mock.patch.object(ap, '_pager_cmd') as cmd:
+                mock.patch.object(tc, 'command') as cmd:
             stream = ap._paged_stream()
             self.popen.assert_called_once_with(
                 cmd.return_value,
