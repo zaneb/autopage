@@ -168,4 +168,8 @@ def DefaultPager() -> PagerCommand:
     used. Otherwise, the default pager for the platform will be used.
     """
 
+    if os.name == 'posix':
+        # Check that we are not running with elevated privileges
+        if os.getuid() not in {0, os.geteuid()}:
+            return PlatformPager()
     return UserSpecifiedPager('PAGER')
