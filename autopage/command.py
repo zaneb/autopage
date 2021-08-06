@@ -17,7 +17,7 @@ import os
 from typing import Optional, Dict, List
 
 
-__all__ = ['DefaultPager', 'PlatformPager', 'Less', 'LV']
+__all__ = ['DefaultPager', 'PlatformPager', 'More', 'Less', 'LV']
 
 
 PagerConfig = collections.namedtuple('PagerConfig', [
@@ -44,6 +44,17 @@ class PagerCommand(metaclass=abc.ABCMeta):
     def environment_variables(self,
                               config: PagerConfig) -> Optional[Dict[str, str]]:
         """Return the dict of any environment variables to set."""
+        return None
+
+
+class More(PagerCommand):
+    """The pager command ``more``."""
+
+    def command(self) -> List[str]:
+        return ['more']
+
+    def environment_variables(self,
+                              config: PagerConfig) -> Optional[Dict[str, str]]:
         return None
 
 
