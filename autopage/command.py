@@ -18,7 +18,9 @@ import sys
 from typing import Optional, Dict, List
 
 
-__all__ = ['DefaultPager', 'PlatformPager', 'More', 'Less', 'LV']
+__all__ = ['DefaultPager', 'UserSpecifiedPager', 'PlatformPager',
+           'CustomPager',
+           'More', 'Less', 'LV']
 
 
 PagerConfig = collections.namedtuple('PagerConfig', [
@@ -112,11 +114,11 @@ class LV(PagerCommand):
         return None
 
 
-class _UserSpecifiedPager(PagerCommand):
+class CustomPager(PagerCommand):
     """A pager command parsed from a user-specified string."""
-    def __init__(self, pager_env: str):
+    def __init__(self, pager_cmdline: str):
         import shlex
-        self._cmd = shlex.split(pager_env)
+        self._cmd = shlex.split(pager_cmdline)
 
     def command(self) -> List[str]:
         return self._cmd
@@ -142,6 +144,22 @@ def PlatformPager() -> PagerCommand:
     return Less()
 
 
+def UserSpecifiedPager(*env_vars: str) -> PagerCommand:
+    """
+    Return the pager command for the current environment.
+
+    Each of the specified environment variables is searched in order; the first
+    one that is set will be used as the pager command. If none of the
+    environment variables is set, the default pager for the platform will be
+    used.
+    """
+    for env_var in env_vars:
+        env_pager = os.getenv(env_var)
+        if env_pager:
+            return CustomPager(env_pager)
+    return PlatformPager()
+
+
 def DefaultPager() -> PagerCommand:
     """
     Return the default pager command for the current environment.
@@ -150,7 +168,4 @@ def DefaultPager() -> PagerCommand:
     used. Otherwise, the default pager for the platform will be used.
     """
 
-    env_pager = os.getenv('PAGER')
-    if env_pager:
-        return _UserSpecifiedPager(env_pager)
-    return PlatformPager()
+    return UserSpecifiedPager('PAGER')
