@@ -198,12 +198,12 @@ class PlatformTest(unittest.TestCase):
     def test_aix_cmd(self):
         with PlatformFixture('aix'):
             cmd = command.PlatformPager()
-            self.assertEqual(['less'], cmd.command())
+            self.assertEqual(['more'], cmd.command())
 
         # Prior to Python 3.8, the version number was included
         with PlatformFixture('aix7'):
             cmd = command.PlatformPager()
-            self.assertEqual(['less'], cmd.command())
+            self.assertEqual(['more'], cmd.command())
 
     def test_linux_cmd(self):
         with PlatformFixture('linux'):

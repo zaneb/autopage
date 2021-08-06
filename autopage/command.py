@@ -13,6 +13,7 @@
 import abc
 import collections
 import os
+import sys
 
 from typing import Optional, Dict, List
 
@@ -132,6 +133,8 @@ def PlatformPager() -> PagerCommand:
     """
     Return the default pager command for the current platform.
     """
+    if sys.platform.startswith('aix'):
+        return More()
     return Less()
 
 
