@@ -152,7 +152,7 @@ import autopage
 def process(input_stream, output_stream):
     pager = autopage.AutoPager(
         output_stream,
-        line_buffering=autopage.line_buffered_input(input_stream),
+        line_buffering=autopage.line_buffer_from_input(input_stream),
         allow_color=True,
         reset_on_exit=True,
         errors=autopage.ErrorStrategy.REPLACE,
