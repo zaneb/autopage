@@ -130,6 +130,7 @@ def isolate(child_function,
         fcntl.ioctl(tty, termios.TIOCSWINSZ,
                     struct.pack('HHHH', lines, columns, 0, 0))
         env = IsolationEnvironment(env_pid, tty)
+        time.sleep(0.05)
         yield env
         time.sleep(0.001)
         env.close()
