@@ -73,14 +73,15 @@ class PagerControl:
             line = '\x1b[?'
             while line.startswith('\x1b[?'):
                 line = self.env.readline()
-            yield line
+            self._total_lines += 1
+            yield line.replace('\x1b[m', '')
 
     def _lines_in_page(self):
         count = 0
         try:
             while True:
                 line = '\x1b[?'
-                while line.strip().startswith('\x1b[?'):
+                while line.lstrip(' q').startswith('\x1b[?'):
                     line = self.env.readline()
                 if '--More--' in line or line == '\x1b[K\n':
                     break
@@ -123,6 +124,9 @@ def isolate(child_function,
         result = child_function()
         os._exit(result or 0)
     else:
+        for fd in (stdin_fd, stdout_fd, stderr_fd):
+            if fd is not None:
+                os.close(fd)
         fcntl.ioctl(tty, termios.TIOCSWINSZ,
                     struct.pack('HHHH', lines, columns, 0, 0))
         env = IsolationEnvironment(env_pid, tty)
