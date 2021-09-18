@@ -29,7 +29,7 @@ def _exit_code_from_status(status):
         return os.waitstatus_to_exitcode(status)
     if os.WIFEXITED(status):
         return os.WEXITSTATUS(status)
-    if os.WIFSIGNALLED(status):
+    if os.WIFSIGNALED(status):
         return -os.WTERMSIG(status)
     raise ValueError('Unknown wait status %r' % status)
 
