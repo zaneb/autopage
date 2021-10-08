@@ -12,8 +12,10 @@
 
 import contextlib
 import fcntl
+import itertools
 import os
 import pty
+import re
 import signal
 import struct
 import sys
@@ -72,32 +74,49 @@ class IsolationEnvironment:
 
 
 class PagerControl:
+    _page_end = object()
+    _ctrl_chars = re.compile(r'\x1b\['
+                             r'(\?|[0-2]?K|[0-9]*;?[0-9]*H|[0-3]?J|[0-9]*m)')
+
     def __init__(self, isolation_env):
         self.env = isolation_env
         self._total_lines = 0
+        self._lines = self._iter_lines()
+
+    def _iter_lines(self):
+        while True:
+            line = '\x1b[?'
+            while line.lstrip(' q').startswith('\x1b[?'):
+                rawline = self.env.readline()
+                line = (rawline.replace('\x07', '')     # Ignore bell
+                               .replace('\x1b[m', ''))  # Ignore style reset
+            before, reset, after = line.partition('\x1b[2J')
+            for segment in filter(bool, (before, after)):
+                if segment == '\x1b[1m~\x1b[0m\n':
+                    # Ignore lines that are filling blank vertical space with
+                    # '~' after hitting Ctrl-C when the screen is not full
+                    continue
+                visible = self._ctrl_chars.sub('', segment)
+                if ((visible.rstrip() == ':' or '(END)' in visible)
+                        and segment.replace('\x1b[m', '') != visible):
+                    yield self._page_end
+                elif visible != '\n' or segment == visible:
+                    self._total_lines += 1
+                    yield visible
 
     def read_lines(self, count):
-        for i in range(count):
-            line = '\x1b[?'
-            while line.startswith('\x1b[?'):
-                line = self.env.readline()
-            self._total_lines += 1
-            yield line.replace('\x1b[m', '')
+        return itertools.islice(filter(lambda l: l is not self._page_end,
+                                       self._lines), count)
 
     def _lines_in_page(self):
-        count = 0
+        original_count = self._total_lines
         try:
-            while True:
-                line = '\x1b[?'
-                while line.lstrip(' q').startswith('\x1b[?'):
-                    line = self.env.readline()
-                if '--More--' in line or line == '\x1b[K\n':
+            for line in self._lines:
+                if line is self._page_end:
                     break
-                count += 1
         except IOError:
             pass
-        self._total_lines += count
-        return count
+        return self._total_lines - original_count
 
     def advance(self):
         self.env.write(b' ')

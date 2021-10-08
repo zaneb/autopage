@@ -79,9 +79,6 @@ def with_stderr_output():
 
 
 class TestEndToEnd(unittest.TestCase):
-    def setUp(self):
-        os.environ['LESS_IS_MORE'] = '1'
-
     def test_page_to_end(self):
         num_lines = 100
         with isolation.isolate(finite(num_lines)) as env:
@@ -176,7 +173,6 @@ class TestEndToEnd(unittest.TestCase):
         self.assertEqual(0, env.exit_code())
 
     def test_short_output(self):
-        del os.environ['LESS_IS_MORE']
         num_lines = 10
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
