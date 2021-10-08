@@ -70,6 +70,14 @@ def with_exception():
     return ap.exit_code()
 
 
+def with_stderr_output():
+    ap = autopage.AutoPager()
+    with ap as out:
+        for i in range(50):
+            print(i, file=out)
+    print("Hello world", file=sys.stderr)
+
+
 class TestEndToEnd(unittest.TestCase):
     def setUp(self):
         os.environ['LESS_IS_MORE'] = '1'
@@ -89,6 +97,7 @@ class TestEndToEnd(unittest.TestCase):
             self.assertEqual(0, pager.quit())
 
             self.assertEqual(num_lines, pager.total_lines())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_page_to_middle(self):
@@ -99,6 +108,7 @@ class TestEndToEnd(unittest.TestCase):
             self.assertEqual(MAX_LINES_PER_PAGE, pager.advance())
             self.assertEqual(MAX_LINES_PER_PAGE, pager.advance())
             self.assertEqual(MAX_LINES_PER_PAGE, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_exit_pager_early(self):
@@ -107,6 +117,7 @@ class TestEndToEnd(unittest.TestCase):
 
             self.assertEqual(MAX_LINES_PER_PAGE, pager.advance())
             self.assertEqual(MAX_LINES_PER_PAGE, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(141, env.exit_code())
 
     def test_interrupt_early(self):
@@ -119,6 +130,7 @@ class TestEndToEnd(unittest.TestCase):
                 continue
             pager.quit()
             self.assertGreater(pager.total_lines(), MAX_LINES_PER_PAGE)
+            self.assertFalse(env.error_output())
         self.assertEqual(130, env.exit_code())
 
     def test_interrupt_early_quit(self):
@@ -129,6 +141,7 @@ class TestEndToEnd(unittest.TestCase):
             env.interrupt()
             pager.quit()
             self.assertGreater(pager.total_lines(), MAX_LINES_PER_PAGE)
+            self.assertFalse(env.error_output())
         self.assertEqual(130, env.exit_code())
 
     def test_interrupt_in_middle_after_complete(self):
@@ -142,6 +155,7 @@ class TestEndToEnd(unittest.TestCase):
                 env.interrupt()
 
             self.assertEqual(MAX_LINES_PER_PAGE, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_interrupt_at_end_after_complete(self):
@@ -158,6 +172,7 @@ class TestEndToEnd(unittest.TestCase):
                 env.interrupt()
 
             self.assertEqual(0, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_short_output(self):
@@ -168,6 +183,7 @@ class TestEndToEnd(unittest.TestCase):
 
             for i, l in enumerate(pager.read_lines(num_lines)):
                 self.assertEqual(str(i), l.rstrip())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_short_output_reset(self):
@@ -176,6 +192,7 @@ class TestEndToEnd(unittest.TestCase):
             pager = isolation.PagerControl(env)
 
             self.assertEqual(num_lines, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_short_streaming_output(self):
@@ -193,6 +210,7 @@ class TestEndToEnd(unittest.TestCase):
 
             env.interrupt()
             self.assertEqual(0, pager.quit())
+            self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
     def test_exception(self):
@@ -210,4 +228,23 @@ class TestEndToEnd(unittest.TestCase):
             self.assertEqual(0, pager.quit())
 
             self.assertEqual(num_lines, pager.total_lines())
+            self.assertFalse(env.error_output())
         self.assertEqual(1, env.exit_code())
+
+    def test_stderr_output(self):
+        num_lines = 50
+        with isolation.isolate(with_stderr_output) as env:
+            pager = isolation.PagerControl(env)
+
+            lines = num_lines
+            while lines > 0:
+                expected = min(lines, MAX_LINES_PER_PAGE)
+                self.assertEqual(expected, pager.advance())
+                lines -= expected
+            self.assertEqual(0, pager.advance())
+            self.assertEqual(0, pager.advance())
+            self.assertEqual(0, pager.quit())
+
+            self.assertEqual(num_lines, pager.total_lines())
+            self.assertEqual('Hello world\n', env.error_output())
+        self.assertEqual(0, env.exit_code())

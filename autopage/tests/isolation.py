@@ -35,11 +35,13 @@ def _exit_code_from_status(status):
 
 
 class IsolationEnvironment:
-    def __init__(self, pid, ptm_fd):
+    def __init__(self, pid, ptm_fd, err_fd=None):
         self._pid = pid
 
         self._ptm_fd = ptm_fd
         self._tty = os.fdopen(ptm_fd, 'r')
+
+        self._err_fd = err_fd
 
         self._exit_code = None
 
@@ -52,6 +54,12 @@ class IsolationEnvironment:
 
     def readline(self):
         return self._tty.readline()
+
+    def error_output(self):
+        if self._err_fd is None:
+            return ''
+        with os.fdopen(self._err_fd, closefd=False) as errf:
+            return errf.read()
 
     def close(self):
         os.kill(self._pid, signal.SIGTERM)
@@ -107,7 +115,11 @@ class PagerControl:
 def isolate(child_function,
             stdin_fd=None, stdout_fd=None, stderr_fd=None,
             *,
-            lines=LINES, columns=COLUMNS):
+            lines=LINES, columns=COLUMNS, stderr_to_tty=False):
+    if stderr_fd is None and not stderr_to_tty:
+        err_output_fd, stderr_fd = os.pipe()
+    else:
+        err_output_fd = None
     for fd in (stdin_fd, stdout_fd, stderr_fd):
         if fd is not None:
             os.set_inheritable(fd, True)
@@ -120,8 +132,12 @@ def isolate(child_function,
         if stdout_fd is not None:
             sys.stdout = os.fdopen(stdout_fd, 'w')
         if stderr_fd is not None:
-            sys.stderr = os.fdopen(stderr_fd, 'w')
-        result = child_function()
+            sys.stderr = os.fdopen(stderr_fd, 'w', buffering=1)
+        try:
+            result = child_function()
+        finally:
+            sys.stdout.close()
+            sys.stderr.close()
         os._exit(result or 0)
     else:
         for fd in (stdin_fd, stdout_fd, stderr_fd):
@@ -129,8 +145,12 @@ def isolate(child_function,
                 os.close(fd)
         fcntl.ioctl(tty, termios.TIOCSWINSZ,
                     struct.pack('HHHH', lines, columns, 0, 0))
-        env = IsolationEnvironment(env_pid, tty)
+        env = IsolationEnvironment(env_pid, tty, err_output_fd)
         time.sleep(0.05)
-        yield env
-        time.sleep(0.001)
-        env.close()
+        try:
+            yield env
+        finally:
+            time.sleep(0.001)
+            if err_output_fd is not None:
+                os.close(err_output_fd)
+            env.close()
