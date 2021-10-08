@@ -25,7 +25,8 @@ MAX_LINES_PER_PAGE = isolation.LINES - 1
 
 def finite(num_lines, **kwargs):
     def finite():
-        ap = autopage.AutoPager(**kwargs)
+        ap = autopage.AutoPager(pager_command=autopage.command.Less(),
+                                **kwargs)
         with ap as out:
             for i in range(num_lines):
                 print(i, file=out)
@@ -34,7 +35,7 @@ def finite(num_lines, **kwargs):
 
 
 def infinite():
-    ap = autopage.AutoPager()
+    ap = autopage.AutoPager(pager_command=autopage.command.Less())
     try:
         with ap as out:
             for i in itertools.count():
@@ -45,7 +46,8 @@ def infinite():
 
 
 def from_stdin():
-    ap = autopage.AutoPager(line_buffering=autopage.line_buffer_from_input())
+    ap = autopage.AutoPager(pager_command=autopage.command.Less(),
+                            line_buffering=autopage.line_buffer_from_input())
     with ap as out:
         try:
             for line in sys.stdin:
@@ -59,7 +61,7 @@ def with_exception():
     class MyException(Exception):
         pass
 
-    ap = autopage.AutoPager()
+    ap = autopage.AutoPager(pager_command=autopage.command.Less())
     try:
         with ap as out:
             for i in range(50):
@@ -71,7 +73,7 @@ def with_exception():
 
 
 def with_stderr_output():
-    ap = autopage.AutoPager()
+    ap = autopage.AutoPager(pager_command=autopage.command.Less())
     with ap as out:
         for i in range(50):
             print(i, file=out)
