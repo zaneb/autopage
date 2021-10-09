@@ -56,7 +56,7 @@ class AutoPager:
 
     def __init__(self,
                  output_stream: Optional[TextIO] = None, *,
-                 pager_command: command.PagerCommand = command.DefaultPager(),
+                 pager_command: command.CommandType = command.DefaultPager(),
                  allow_color: bool = True,
                  line_buffering: Optional[bool] = None,
                  reset_on_exit: bool = False,
@@ -64,7 +64,7 @@ class AutoPager:
         self._use_stdout = output_stream is None or output_stream is sys.stdout
         self._out = sys.stdout if output_stream is None else output_stream
         self._tty = (not self._out.closed) and self._out.isatty()
-        self._command = pager_command
+        self._command = command.get_pager_command(pager_command)
         self._config = command.PagerConfig(
                 color=allow_color,
                 line_buffering_requested=bool(line_buffering),

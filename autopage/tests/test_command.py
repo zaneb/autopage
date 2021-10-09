@@ -257,3 +257,34 @@ class PlatformTest(unittest.TestCase):
         with PlatformFixture('freebsd8'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
+
+
+class GetPagerCommandTest(unittest.TestCase):
+    def test_instance(self):
+        cmd = command.PlatformPager()
+        self.assertIs(cmd, command.get_pager_command(cmd))
+
+    def test_subclass(self):
+        cls = command.Less
+        self.assertIsInstance(command.get_pager_command(cls), cls)
+
+    def test_func(self):
+        func = command.PlatformPager
+        self.assertIsInstance(command.get_pager_command(func), type(func()))
+
+    def test_string(self):
+        cmd = command.get_pager_command('foo bar')
+        self.assertIsInstance(cmd, command.CustomPager)
+        self.assertEqual(['foo', 'bar'], cmd.command())
+
+    def test_list(self):
+        with fixtures.EnvironmentVariable('FOO', 'foo'):
+            cmd = command.get_pager_command(['FOO', 'BAR'])
+        self.assertIsInstance(cmd, command.CustomPager)
+        self.assertEqual(['foo'], cmd.command())
+
+    def test_int(self):
+        self.assertRaises(TypeError, command.get_pager_command, 42)
+
+    def test_list_int(self):
+        self.assertRaises(TypeError, command.get_pager_command, ['FOO', 42])

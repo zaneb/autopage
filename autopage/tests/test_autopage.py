@@ -57,6 +57,50 @@ class PagedStreamTest(fixtures.TestWithFixtures):
                 stdout=None)
             self.assertIs(stream, self.popen.return_value.stdin)
 
+    def test_defaults_cmd_as_class(self):
+        class TestCommand(command.PagerCommand):
+            def command(self):
+                return []
+
+            def environment_variables(self, config):
+                return None
+
+        with mock.patch.object(TestCommand, 'command') as cmd:
+            ap = autopage.AutoPager(pager_command=TestCommand,
+                                    line_buffering=False)
+            with mock.patch.object(ap, '_pager_env') as get_env:
+                stream = ap._paged_stream()
+                self.popen.assert_called_once_with(
+                    cmd.return_value,
+                    env=get_env.return_value,
+                    bufsize=-1,
+                    universal_newlines=True,
+                    encoding='UTF-8',
+                    errors='strict',
+                    stdin=subprocess.PIPE,
+                    stdout=None)
+                self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_defaults_cmd_as_string(self):
+        ap = autopage.AutoPager(pager_command='foo bar',
+                                line_buffering=False)
+        with mock.patch.object(ap, '_pager_env') as get_env:
+            stream = ap._paged_stream()
+            self.popen.assert_called_once_with(
+                ['foo', 'bar'],
+                env=get_env.return_value,
+                bufsize=-1,
+                universal_newlines=True,
+                encoding='UTF-8',
+                errors='strict',
+                stdin=subprocess.PIPE,
+                stdout=None)
+            self.assertIs(stream, self.popen.return_value.stdin)
+
+    def test_defaults_cmd_as_int(self):
+        self.assertRaises(TypeError, autopage.AutoPager,
+                          pager_command=42)
+
     def test_line_buffering(self):
         ap = autopage.AutoPager(line_buffering=True)
         stream = ap._paged_stream()

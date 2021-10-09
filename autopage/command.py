@@ -12,9 +12,11 @@
 
 import abc
 import collections
+import collections.abc
 import os
 import sys
 
+import typing
 from typing import Optional, Dict, List
 
 
@@ -173,3 +175,27 @@ def DefaultPager() -> PagerCommand:
         if os.getuid() not in {0, os.geteuid()}:
             return PlatformPager()
     return UserSpecifiedPager('PAGER')
+
+
+CommandType = typing.Union[PagerCommand,
+                           typing.Callable[[], PagerCommand],
+                           str,
+                           typing.Sequence[str]]
+
+
+def get_pager_command(pager_command: CommandType) -> PagerCommand:
+    if isinstance(pager_command, PagerCommand):
+        return pager_command
+
+    if isinstance(pager_command, str):
+        return CustomPager(pager_command)
+
+    if isinstance(pager_command, collections.abc.Sequence):
+        return UserSpecifiedPager(*pager_command)
+
+    if callable(pager_command):
+        cmd = pager_command()
+        if isinstance(cmd, PagerCommand):
+            return cmd
+
+    raise TypeError('Invalid type for ``pager_command``')
