@@ -7,6 +7,14 @@
 %bcond_with pyproject
 %endif
 
+# Macros for disabling tests on CentOS 7
+%if 0%{?el7}
+%bcond_with enable_tests
+%else
+%bcond_without enable_tests
+%endif
+
+
 Name:           python-%{srcname}
 Version:        0.4.0
 Release:        1%{?dist}
@@ -30,7 +38,9 @@ BuildRequires:  python3-devel
 %if %{with pyproject}
 BuildRequires:  pyproject-rpm-macros
 %else
+%if %{with enable_tests}
 BuildRequires:  %{py3_dist fixtures}
+%endif
 %endif
 
 %description -n python3-%{srcname} %_description
@@ -61,10 +71,12 @@ cp %{SOURCE1} ./
 %endif
 
 %check
+%if %{with enable_tests}
 %if %{with pyproject}
 %tox
 %else
 %{python3} setup.py test
+%endif
 %endif
 
 %if %{with pyproject}
