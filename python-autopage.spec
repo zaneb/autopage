@@ -1,7 +1,7 @@
 %global srcname autopage
 
 # Macros for pyproject (Fedora) vs. setup.py (CentOS)
-%if 0%{?fedora}
+%if 0%{?fedora} >= 33
 %bcond_without pyproject
 %else
 %bcond_with pyproject
