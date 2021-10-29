@@ -13,6 +13,7 @@
 import contextlib
 import fcntl
 import itertools
+import multiprocessing
 import os
 import pty
 import re
@@ -27,14 +28,10 @@ import time
 (LINES, COLUMNS) = (24, 80)
 
 
-def _exit_code_from_status(status):
-    if hasattr(os, 'waitstatus_to_exitcode'):
-        return os.waitstatus_to_exitcode(status)
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return -os.WTERMSIG(status)
-    raise ValueError('Unknown wait status %r' % status)
+def _open_fifo(path, write):
+    if path is None:
+        return None
+    return os.open(path, os.O_WRONLY if write else os.O_RDONLY)
 
 
 class IsolationEnvironment:
@@ -45,14 +42,9 @@ class IsolationEnvironment:
         self._ptm_fd = ptm_fd
         self._tty = os.fdopen(ptm_fd, 'r')
 
-        def open_fifo(path, out):
-            if path is None:
-                return None
-            return os.open(path, os.O_RDONLY if out else os.O_WRONLY)
-
-        self._stdin_fifo_fd = open_fifo(stdin_fifo, False)
-        self._stdout_fifo_fd = open_fifo(stdout_fifo, True)
-        self._stderr_fifo_fd = open_fifo(stderr_fifo, True)
+        self._stdin_fifo_fd = _open_fifo(stdin_fifo, True)
+        self._stdout_fifo_fd = _open_fifo(stdout_fifo, False)
+        self._stderr_fifo_fd = _open_fifo(stderr_fifo, False)
 
         self._exit_code = None
 
@@ -76,10 +68,10 @@ class IsolationEnvironment:
         assert self._stdin_fifo_fd is not None
         return os.fdopen(self._stdin_fifo_fd, 'w', closefd=False)
 
-    def close(self):
+    def close(self, get_return_code):
         os.kill(self._pid, signal.SIGTERM)
-        pid, status = os.waitpid(self._pid, 0)
-        self._exit_code = _exit_code_from_status(status)
+        os.waitpid(self._pid, 0)
+        self._exit_code = get_return_code()
         self._tty.close()
         for fifo_fd in (self._stdin_fifo_fd,
                         self._stdout_fifo_fd,
@@ -171,6 +163,10 @@ def _fifos(*fifo_names):
             yield fifos
 
 
+class TestProcessNotComplete(Exception):
+    pass
+
+
 @contextlib.contextmanager
 def isolate(child_function,
             stdin_pipe=False, stdout_pipe=False, stderr_pipe=True,
@@ -179,34 +175,72 @@ def isolate(child_function,
     with _fifos('stdin' if stdin_pipe else None,
                 'stdout' if stdout_pipe else None,
                 'stderr' if stderr_pipe else None) as fifo_paths:
+        result_r, result_w = os.pipe()
         env_pid, tty = pty.fork()
         if env_pid == 0:
-            os.environ['TERM'] = 'xterm-256color'
-            stdin_fifo, stdout_fifo, stderr_fifo = fifo_paths
-            if stdin_fifo is not None:
-                old_stdin, sys.stdin = sys.stdin, open(stdin_fifo)
-                old_stdin.close()
-            if stdout_fifo is not None:
-                old_stdout, sys.stdout = sys.stdout, open(stdout_fifo,
-                                                          'w')
-                old_stdout.close()
-            if stderr_fifo is not None:
-                old_stderr, sys.stderr = sys.stderr, open(stderr_fifo,
-                                                          'w', buffering=1)
-                old_stderr.close()
-            try:
-                result = child_function()
-            finally:
-                sys.stdout.close()
-                sys.stderr.close()
-            os._exit(result or 0)
+            os.close(result_r)
+            pts = os.ttyname(sys.stdout.fileno())
+
+            ctx = multiprocessing.get_context('fork')
+            p = ctx.Process(target=_run_test, args=(child_function, pts,
+                                                    *fifo_paths))
+            p.start()
+
+            def handle_terminate(signum, frame):
+                if p.is_alive():
+                    p.terminate()
+
+            signal.signal(signal.SIGTERM, handle_terminate)
+            # Signals from the pty are for the test process, not us
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+            p.join(2)  # Wait at most 2s
+            with os.fdopen(result_w, 'w') as result_writer:
+                result_writer.write(f'{p.exitcode}\n')
+
+            os._exit(0)
         else:
+            os.close(result_w)
             fcntl.ioctl(tty, termios.TIOCSWINSZ,
                         struct.pack('HHHH', lines, columns, 0, 0))
             env = IsolationEnvironment(env_pid, tty, *fifo_paths)
-            time.sleep(0.02)
+            time.sleep(0.01)
             try:
                 yield env
             finally:
                 time.sleep(0.001)
-                env.close()
+
+                def get_return_code():
+                    with os.fdopen(result_r) as result_reader:
+                        result = result_reader.readline().rstrip()
+                        if result == 'None':
+                            raise TestProcessNotComplete
+                        return int(result)
+
+                env.close(get_return_code)
+
+
+def _run_test(test_function, pts, stdin_fifo, stdout_fifo, stderr_fifo):
+    os.environ['TERM'] = 'xterm-256color'
+
+    tty_fd = os.open(pts, os.O_RDWR)
+    if stdin_fifo is not None:
+        old_stdin, sys.stdin = sys.stdin, open(stdin_fifo)
+        old_stdin.close()
+    else:
+        os.dup2(tty_fd, pty.STDIN_FILENO)
+    if stdout_fifo is not None:
+        old_stdout, sys.stdout = sys.stdout, open(stdout_fifo, 'w')
+        old_stdout.close()
+    else:
+        os.dup2(tty_fd, pty.STDOUT_FILENO)
+    if stderr_fifo is not None:
+        old_stderr, sys.stderr = sys.stderr, open(stderr_fifo, 'w',
+                                                  buffering=1)
+        old_stderr.close()
+    else:
+        os.dup2(tty_fd, pty.STDERR_FILENO)
+    os.close(tty_fd)
+
+    result = test_function()
+    sys.exit(result or 0)
