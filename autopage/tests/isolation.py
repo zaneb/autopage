@@ -19,8 +19,9 @@ import re
 import signal
 import struct
 import sys
-import time
+import tempfile
 import termios
+import time
 
 
 (LINES, COLUMNS) = (24, 80)
@@ -37,13 +38,21 @@ def _exit_code_from_status(status):
 
 
 class IsolationEnvironment:
-    def __init__(self, pid, ptm_fd, err_fd=None):
+    def __init__(self, pid, ptm_fd,
+                 stdin_fifo=None, stdout_fifo=None, stderr_fifo=None):
         self._pid = pid
 
         self._ptm_fd = ptm_fd
         self._tty = os.fdopen(ptm_fd, 'r')
 
-        self._err_fd = err_fd
+        def open_fifo(path, out):
+            if path is None:
+                return None
+            return os.open(path, os.O_RDONLY if out else os.O_WRONLY)
+
+        self._stdin_fifo_fd = open_fifo(stdin_fifo, False)
+        self._stdout_fifo_fd = open_fifo(stdout_fifo, True)
+        self._stderr_fifo_fd = open_fifo(stderr_fifo, True)
 
         self._exit_code = None
 
@@ -58,16 +67,25 @@ class IsolationEnvironment:
         return self._tty.readline()
 
     def error_output(self):
-        if self._err_fd is None:
+        if self._stderr_fifo_fd is None:
             return ''
-        with os.fdopen(self._err_fd, closefd=False) as errf:
+        with os.fdopen(self._stderr_fifo_fd, closefd=False) as errf:
             return errf.read()
+
+    def stdin_pipe(self):
+        assert self._stdin_fifo_fd is not None
+        return os.fdopen(self._stdin_fifo_fd, 'w', closefd=False)
 
     def close(self):
         os.kill(self._pid, signal.SIGTERM)
         pid, status = os.waitpid(self._pid, 0)
         self._exit_code = _exit_code_from_status(status)
         self._tty.close()
+        for fifo_fd in (self._stdin_fifo_fd,
+                        self._stdout_fifo_fd,
+                        self._stderr_fifo_fd):
+            if fifo_fd is not None:
+                os.close(fifo_fd)
 
     def exit_code(self):
         return self._exit_code
@@ -131,45 +149,64 @@ class PagerControl:
 
 
 @contextlib.contextmanager
-def isolate(child_function,
-            stdin_fd=None, stdout_fd=None, stderr_fd=None,
-            *,
-            lines=LINES, columns=COLUMNS, stderr_to_tty=False):
-    if stderr_fd is None and not stderr_to_tty:
-        err_output_fd, stderr_fd = os.pipe()
-    else:
-        err_output_fd = None
-    for fd in (stdin_fd, stdout_fd, stderr_fd):
-        if fd is not None:
-            os.set_inheritable(fd, True)
+def _fifo(fifo_path):
+    try:
+        os.mkfifo(fifo_path, 0o600)
+        yield fifo_path
+    finally:
+        try:
+            os.unlink(fifo_path)
+        except OSError:
+            pass
 
-    env_pid, tty = pty.fork()
-    if env_pid == 0:
-        os.environ['TERM'] = 'xterm-256color'
-        if stdin_fd is not None:
-            sys.stdin = os.fdopen(stdin_fd)
-        if stdout_fd is not None:
-            sys.stdout = os.fdopen(stdout_fd, 'w')
-        if stderr_fd is not None:
-            sys.stderr = os.fdopen(stderr_fd, 'w', buffering=1)
-        try:
-            result = child_function()
-        finally:
-            sys.stdout.close()
-            sys.stderr.close()
-        os._exit(result or 0)
-    else:
-        for fd in (stdin_fd, stdout_fd, stderr_fd):
-            if fd is not None:
-                os.close(fd)
-        fcntl.ioctl(tty, termios.TIOCSWINSZ,
-                    struct.pack('HHHH', lines, columns, 0, 0))
-        env = IsolationEnvironment(env_pid, tty, err_output_fd)
-        time.sleep(0.05)
-        try:
-            yield env
-        finally:
-            time.sleep(0.001)
-            if err_output_fd is not None:
-                os.close(err_output_fd)
-            env.close()
+
+@contextlib.contextmanager
+def _fifos(*fifo_names):
+    with tempfile.TemporaryDirectory() as directory:
+        with contextlib.ExitStack() as stack:
+            fifos = [stack.enter_context(_fifo(os.path.join(directory,
+                                                            name)))
+                     if name is not None else None
+                     for name in fifo_names]
+            yield fifos
+
+
+@contextlib.contextmanager
+def isolate(child_function,
+            stdin_pipe=False, stdout_pipe=False, stderr_pipe=True,
+            *,
+            lines=LINES, columns=COLUMNS):
+    with _fifos('stdin' if stdin_pipe else None,
+                'stdout' if stdout_pipe else None,
+                'stderr' if stderr_pipe else None) as fifo_paths:
+        env_pid, tty = pty.fork()
+        if env_pid == 0:
+            os.environ['TERM'] = 'xterm-256color'
+            stdin_fifo, stdout_fifo, stderr_fifo = fifo_paths
+            if stdin_fifo is not None:
+                old_stdin, sys.stdin = sys.stdin, open(stdin_fifo)
+                old_stdin.close()
+            if stdout_fifo is not None:
+                old_stdout, sys.stdout = sys.stdout, open(stdout_fifo,
+                                                          'w')
+                old_stdout.close()
+            if stderr_fifo is not None:
+                old_stderr, sys.stderr = sys.stderr, open(stderr_fifo,
+                                                          'w', buffering=1)
+                old_stderr.close()
+            try:
+                result = child_function()
+            finally:
+                sys.stdout.close()
+                sys.stderr.close()
+            os._exit(result or 0)
+        else:
+            fcntl.ioctl(tty, termios.TIOCSWINSZ,
+                        struct.pack('HHHH', lines, columns, 0, 0))
+            env = IsolationEnvironment(env_pid, tty, *fifo_paths)
+            time.sleep(0.02)
+            try:
+                yield env
+            finally:
+                time.sleep(0.001)
+                env.close()

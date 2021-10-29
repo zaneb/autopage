@@ -11,7 +11,6 @@
 #   under the License.
 
 import itertools
-import os
 import unittest
 import sys
 
@@ -195,11 +194,10 @@ class TestEndToEnd(unittest.TestCase):
 
     def test_short_streaming_output(self):
         num_lines = 10
-        r, w = os.pipe()
-        with isolation.isolate(from_stdin, stdin_fd=r) as env:
+        with isolation.isolate(from_stdin, stdin_pipe=True) as env:
             pager = isolation.PagerControl(env)
 
-            with os.fdopen(w, 'w') as in_pipe:
+            with env.stdin_pipe() as in_pipe:
                 for i in range(num_lines):
                     print(i, file=in_pipe)
 
