@@ -22,15 +22,18 @@ import autopage
 MAX_LINES_PER_PAGE = isolation.LINES - 1
 
 
-def finite(num_lines, **kwargs):
-    def finite():
+class finite:
+    def __init__(self, num_lines, **kwargs):
+        self.num_lines = num_lines
+        self.kwargs = kwargs
+
+    def __call__(self):
         ap = autopage.AutoPager(pager_command=autopage.command.Less(),
-                                **kwargs)
+                                **self.kwargs)
         with ap as out:
-            for i in range(num_lines):
+            for i in range(self.num_lines):
                 print(i, file=out)
         return ap.exit_code()
-    return finite
 
 
 def infinite():
