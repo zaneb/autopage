@@ -51,10 +51,10 @@ class IsolationEnvironment:
 
     def interrupt(self):
         self.write(b'\x03')
+        time.sleep(0.001)
 
     def write(self, data):
         os.write(self._ptm_fd, data)
-        time.sleep(0.001)
 
     def readline(self):
         return self._tty.readline()
