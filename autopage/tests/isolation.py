@@ -23,6 +23,7 @@ import sys
 import tempfile
 import termios
 import time
+import traceback
 
 
 (LINES, COLUMNS) = (24, 80)
@@ -178,23 +179,32 @@ def isolate(child_function,
         result_r, result_w = os.pipe()
         env_pid, tty = pty.fork()
         if env_pid == 0:
-            os.close(result_r)
-            pts = os.ttyname(sys.stdout.fileno())
+            try:
+                os.close(result_r)
+                pts = os.ttyname(sys.stdout.fileno())
 
-            ctx = multiprocessing.get_context('fork')
-            p = ctx.Process(target=_run_test, args=(child_function, pts,
-                                                    *fifo_paths))
-            p.start()
+                ctx = multiprocessing.get_context('fork')
+                p = ctx.Process(target=_run_test, args=(child_function, pts,
+                                                        *fifo_paths))
+                p.start()
 
-            def handle_terminate(signum, frame):
-                if p.is_alive():
-                    p.terminate()
+                def handle_terminate(signum, frame):
+                    if p.is_alive():
+                        p.terminate()
 
-            signal.signal(signal.SIGTERM, handle_terminate)
-            # Signals from the pty are for the test process, not us
-            signal.signal(signal.SIGINT, signal.SIG_IGN)
+                signal.signal(signal.SIGTERM, handle_terminate)
+                # Signals from the pty are for the test process, not us
+                signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-            p.join(2)  # Wait at most 2s
+                p.join(2)  # Wait at most 2s
+            except BaseException:
+                with os.fdopen(result_w, 'w') as result_writer:
+                    traceback.print_exc(file=result_writer)
+                # Prevent blocking in parent process by opening our end of all
+                # FIFOs.
+                for path, write in zip(fifo_paths, [True, False, False]):
+                    _open_fifo(path, write)
+                os._exit(1)
             with os.fdopen(result_w, 'w') as result_writer:
                 result_writer.write(f'{p.exitcode}\n')
 
@@ -213,9 +223,13 @@ def isolate(child_function,
                 def get_return_code():
                     with os.fdopen(result_r) as result_reader:
                         result = result_reader.readline().rstrip()
-                        if result == 'None':
-                            raise TestProcessNotComplete
-                        return int(result)
+                        try:
+                            return int(result)
+                        except ValueError:
+                            pass
+                        trace = result_reader.read()
+                        raise TestProcessNotComplete('\n'.join([result,
+                                                                trace]))
 
                 env.close(get_return_code)
 
