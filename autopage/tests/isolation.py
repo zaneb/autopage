@@ -62,8 +62,15 @@ class IsolationEnvironment:
     def error_output(self):
         if self._stderr_fifo_fd is None:
             return ''
-        with os.fdopen(self._stderr_fifo_fd, closefd=False) as errf:
+        with os.fdopen(self._stderr_fifo_fd) as errf:
+            self._stderr_fifo_fd = None
             return errf.read()
+
+    def stdout_pipe(self):
+        assert self._stdout_fifo_fd is not None
+        stdout = os.fdopen(self._stdout_fifo_fd)
+        self._stdout_fifo_fd = None
+        return stdout
 
     def stdin_pipe(self):
         assert self._stdin_fifo_fd is not None
