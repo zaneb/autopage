@@ -70,8 +70,13 @@ class IsolationEnvironment:
         return os.fdopen(self._stdin_fifo_fd, 'w', closefd=False)
 
     def close(self, get_return_code):
-        os.kill(self._pid, signal.SIGTERM)
-        os.waitpid(self._pid, 0)
+        for i in range(50):
+            if os.waitpid(self._pid, os.WNOHANG) != (0, 0):
+                break
+            time.sleep(0.001)
+        else:
+            os.kill(self._pid, signal.SIGTERM)
+            os.waitpid(self._pid, 0)
         self._exit_code = get_return_code()
         self._tty.close()
         for fifo_fd in (self._stdin_fifo_fd,
@@ -183,7 +188,7 @@ def isolate(child_function,
                 os.close(result_r)
                 pts = os.ttyname(sys.stdout.fileno())
 
-                ctx = multiprocessing.get_context('fork')
+                ctx = multiprocessing.get_context('spawn')
                 p = ctx.Process(target=_run_test, args=(child_function, pts,
                                                         *fifo_paths))
                 p.start()
@@ -218,8 +223,6 @@ def isolate(child_function,
             try:
                 yield env
             finally:
-                time.sleep(0.001)
-
                 def get_return_code():
                     with os.fdopen(result_r) as result_reader:
                         result = result_reader.readline().rstrip()
