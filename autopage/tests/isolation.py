@@ -25,19 +25,26 @@ import termios
 import time
 import traceback
 
+import types
+from typing import Optional, Generator
+import typing
+
 
 (LINES, COLUMNS) = (24, 80)
 
 
-def _open_fifo(path, write):
+def _open_fifo(path: Optional[str],
+               write: bool) -> Optional[int]:
     if path is None:
         return None
     return os.open(path, os.O_WRONLY if write else os.O_RDONLY)
 
 
 class IsolationEnvironment:
-    def __init__(self, pid, ptm_fd,
-                 stdin_fifo=None, stdout_fifo=None, stderr_fifo=None):
+    def __init__(self, pid: int, ptm_fd: int,
+                 stdin_fifo: Optional[str] = None,
+                 stdout_fifo: Optional[str] = None,
+                 stderr_fifo: Optional[str] = None):
         self._pid = pid
 
         self._ptm_fd = ptm_fd
@@ -47,36 +54,36 @@ class IsolationEnvironment:
         self._stdout_fifo_fd = _open_fifo(stdout_fifo, False)
         self._stderr_fifo_fd = _open_fifo(stderr_fifo, False)
 
-        self._exit_code = None
+        self._exit_code: Optional[int] = None
 
-    def interrupt(self):
+    def interrupt(self) -> None:
         self.write(b'\x03')
         time.sleep(0.001)
 
-    def write(self, data):
+    def write(self, data: bytes) -> None:
         os.write(self._ptm_fd, data)
 
-    def readline(self):
+    def readline(self) -> str:
         return self._tty.readline()
 
-    def error_output(self):
+    def error_output(self) -> str:
         if self._stderr_fifo_fd is None:
             return ''
         with os.fdopen(self._stderr_fifo_fd) as errf:
             self._stderr_fifo_fd = None
             return errf.read()
 
-    def stdout_pipe(self):
+    def stdout_pipe(self) -> typing.TextIO:
         assert self._stdout_fifo_fd is not None
         stdout = os.fdopen(self._stdout_fifo_fd)
         self._stdout_fifo_fd = None
         return stdout
 
-    def stdin_pipe(self):
+    def stdin_pipe(self) -> typing.TextIO:
         assert self._stdin_fifo_fd is not None
         return os.fdopen(self._stdin_fifo_fd, 'w', closefd=False)
 
-    def close(self, get_return_code):
+    def close(self, get_return_code: typing.Callable[[], int]) -> None:
         for i in range(50):
             if os.waitpid(self._pid, os.WNOHANG) != (0, 0):
                 break
@@ -92,21 +99,23 @@ class IsolationEnvironment:
             if fifo_fd is not None:
                 os.close(fifo_fd)
 
-    def exit_code(self):
+    def exit_code(self) -> int:
+        assert self._exit_code is not None
         return self._exit_code
 
 
 class PagerControl:
-    _page_end = object()
+    _page_end = None
     _ctrl_chars = re.compile(r'\x1b\['
                              r'(\?|[0-2]?K|[0-9]*;?[0-9]*H|[0-3]?J|[0-9]*m)')
 
-    def __init__(self, isolation_env):
+    def __init__(self, isolation_env: IsolationEnvironment):
         self.env = isolation_env
         self._total_lines = 0
         self._lines = self._iter_lines()
 
-    def _iter_lines(self):
+    def _iter_lines(self) -> Generator[typing.Union[str, None],
+                                       None, None]:
         while True:
             line = '\x1b[?'
             while line.lstrip(' q').startswith('\x1b[?'):
@@ -127,11 +136,11 @@ class PagerControl:
                     self._total_lines += 1
                     yield visible
 
-    def read_lines(self, count):
-        return itertools.islice(filter(lambda l: l is not self._page_end,
-                                       self._lines), count)
+    def read_lines(self, count: int) -> typing.Iterator[str]:
+        return itertools.islice((line for line in self._lines
+                                 if line is not self._page_end), count)
 
-    def _lines_in_page(self):
+    def _lines_in_page(self) -> int:
         original_count = self._total_lines
         try:
             for line in self._lines:
@@ -141,20 +150,20 @@ class PagerControl:
             pass
         return self._total_lines - original_count
 
-    def advance(self):
+    def advance(self) -> int:
         self.env.write(b' ')
         return self._lines_in_page()
 
-    def quit(self):
+    def quit(self) -> int:
         self.env.write(b'q')
         return self._lines_in_page()
 
-    def total_lines(self):
+    def total_lines(self) -> int:
         return self._total_lines
 
 
 @contextlib.contextmanager
-def _fifo(fifo_path):
+def _fifo(fifo_path: str) -> Generator[str, None, None]:
     try:
         os.mkfifo(fifo_path, 0o600)
         yield fifo_path
@@ -166,7 +175,8 @@ def _fifo(fifo_path):
 
 
 @contextlib.contextmanager
-def _fifos(*fifo_names):
+def _fifos(*fifo_names: Optional[str]) -> Generator[typing.List[Optional[str]],
+                                                    None, None]:
     with tempfile.TemporaryDirectory() as directory:
         with contextlib.ExitStack() as stack:
             fifos = [stack.enter_context(_fifo(os.path.join(directory,
@@ -181,10 +191,14 @@ class TestProcessNotComplete(Exception):
 
 
 @contextlib.contextmanager
-def isolate(child_function,
-            stdin_pipe=False, stdout_pipe=False, stderr_pipe=True,
+def isolate(child_function: typing.Callable[[], int],
+            stdin_pipe: bool = False,
+            stdout_pipe: bool = False,
+            stderr_pipe: bool = True,
             *,
-            lines=LINES, columns=COLUMNS):
+            lines: int = LINES,
+            columns: int = COLUMNS) -> Generator[IsolationEnvironment,
+                                                 None, None]:
     with _fifos('stdin' if stdin_pipe else None,
                 'stdout' if stdout_pipe else None,
                 'stderr' if stderr_pipe else None) as fifo_paths:
@@ -200,7 +214,8 @@ def isolate(child_function,
                                                         *fifo_paths))
                 p.start()
 
-                def handle_terminate(signum, frame):
+                def handle_terminate(signum: int,
+                                     frame: types.FrameType) -> None:
                     if p.is_alive():
                         p.terminate()
 
@@ -230,7 +245,7 @@ def isolate(child_function,
             try:
                 yield env
             finally:
-                def get_return_code():
+                def get_return_code() -> int:
                     with os.fdopen(result_r) as result_reader:
                         result = result_reader.readline().rstrip()
                         try:
@@ -244,7 +259,11 @@ def isolate(child_function,
                 env.close(get_return_code)
 
 
-def _run_test(test_function, pts, stdin_fifo, stdout_fifo, stderr_fifo):
+def _run_test(test_function: typing.Callable[[], int],
+              pts: str,
+              stdin_fifo: Optional[str],
+              stdout_fifo: Optional[str],
+              stderr_fifo: Optional[str]) -> typing.NoReturn:
     os.environ['TERM'] = 'xterm-256color'
 
     tty_fd = os.open(pts, os.O_RDWR)

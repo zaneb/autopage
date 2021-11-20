@@ -15,11 +15,11 @@ import os
 import pty
 import tempfile
 
-import fixtures
+import fixtures  # type: ignore
 
 
 class TTYFixture(fixtures.Fixture):
-    def _setUp(self):
+    def _setUp(self) -> None:
         self._k, term = pty.openpty()
         self.stream = os.fdopen(term, 'w')
         self.addCleanup(self.stream.close)
@@ -27,13 +27,10 @@ class TTYFixture(fixtures.Fixture):
 
 
 class TempFixture(fixtures.Fixture):
-    def __init__(self, nativeio=True):
-        self._nativeio = nativeio
-
-    def _setUp(self):
+    def _setUp(self) -> None:
         self.stream = tempfile.TemporaryFile('w')
 
-        def close():
+        def close() -> None:
             try:
                 self.stream.close()
             except ValueError:
@@ -43,6 +40,6 @@ class TempFixture(fixtures.Fixture):
 
 
 class BufferFixture(fixtures.Fixture):
-    def _setUp(self):
+    def _setUp(self) -> None:
         self.stream = io.StringIO()
         self.addCleanup(self.stream.close)
