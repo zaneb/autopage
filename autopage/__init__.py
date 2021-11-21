@@ -186,8 +186,10 @@ class AutoPager:
         if self._pager is not None:
             # Pager ignores Ctrl-C, so we should too
             with _sigint_ignore():
+                pager_in = self._pager.stdin
+                assert pager_in is not None
                 try:
-                    typing.cast(TextIO, self._pager.stdin).close()
+                    pager_in.close()
                 except BrokenPipeError:
                     # Other end of pipe already closed
                     self._exit_code = _signal_exit_code(signal.SIGPIPE)
