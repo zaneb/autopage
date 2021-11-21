@@ -16,6 +16,8 @@ import sys
 
 from autopage.tests import isolation
 
+import typing
+
 import autopage
 
 
@@ -23,11 +25,11 @@ MAX_LINES_PER_PAGE = isolation.LINES - 1
 
 
 class finite:
-    def __init__(self, num_lines, **kwargs):
+    def __init__(self, num_lines: int, **kwargs: typing.Any):
         self.num_lines = num_lines
         self.kwargs = kwargs
 
-    def __call__(self):
+    def __call__(self) -> int:
         ap = autopage.AutoPager(pager_command=autopage.command.Less(),
                                 **self.kwargs)
         with ap as out:
@@ -36,7 +38,7 @@ class finite:
         return ap.exit_code()
 
 
-def infinite():
+def infinite() -> int:
     ap = autopage.AutoPager(pager_command=autopage.command.Less())
     try:
         with ap as out:
@@ -47,7 +49,7 @@ def infinite():
     return ap.exit_code()
 
 
-def from_stdin():
+def from_stdin() -> int:
     ap = autopage.AutoPager(pager_command=autopage.command.Less(),
                             line_buffering=autopage.line_buffer_from_input())
     with ap as out:
@@ -59,7 +61,7 @@ def from_stdin():
     return ap.exit_code()
 
 
-def with_exception():
+def with_exception() -> int:
     class MyException(Exception):
         pass
 
@@ -74,16 +76,17 @@ def with_exception():
     return ap.exit_code()
 
 
-def with_stderr_output():
+def with_stderr_output() -> int:
     ap = autopage.AutoPager(pager_command=autopage.command.Less())
     with ap as out:
         for i in range(50):
             print(i, file=out)
     print("Hello world", file=sys.stderr)
+    return ap.exit_code()
 
 
 class InvokePagerTest(unittest.TestCase):
-    def test_page_to_end(self):
+    def test_page_to_end(self) -> None:
         num_lines = 100
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
@@ -101,7 +104,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_page_to_middle(self):
+    def test_page_to_middle(self) -> None:
         num_lines = 100
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
@@ -112,7 +115,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_exit_pager_early(self):
+    def test_exit_pager_early(self) -> None:
         with isolation.isolate(infinite) as env:
             pager = isolation.PagerControl(env)
 
@@ -121,7 +124,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(141, env.exit_code())
 
-    def test_interrupt_early(self):
+    def test_interrupt_early(self) -> None:
         with isolation.isolate(infinite) as env:
             pager = isolation.PagerControl(env)
 
@@ -134,7 +137,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(130, env.exit_code())
 
-    def test_interrupt_early_quit(self):
+    def test_interrupt_early_quit(self) -> None:
         with isolation.isolate(infinite) as env:
             pager = isolation.PagerControl(env)
 
@@ -145,7 +148,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(130, env.exit_code())
 
-    def test_interrupt_in_middle_after_complete(self):
+    def test_interrupt_in_middle_after_complete(self) -> None:
         num_lines = 100
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
@@ -159,7 +162,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_interrupt_at_end_after_complete(self):
+    def test_interrupt_at_end_after_complete(self) -> None:
         num_lines = 100
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
@@ -176,7 +179,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_short_output(self):
+    def test_short_output(self) -> None:
         num_lines = 10
         with isolation.isolate(finite(num_lines)) as env:
             pager = isolation.PagerControl(env)
@@ -186,7 +189,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_short_output_reset(self):
+    def test_short_output_reset(self) -> None:
         num_lines = 10
         with isolation.isolate(finite(num_lines, reset_on_exit=True)) as env:
             pager = isolation.PagerControl(env)
@@ -195,7 +198,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_short_streaming_output(self):
+    def test_short_streaming_output(self) -> None:
         num_lines = 10
         with isolation.isolate(from_stdin, stdin_pipe=True) as env:
             pager = isolation.PagerControl(env)
@@ -212,7 +215,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_exception(self):
+    def test_exception(self) -> None:
         num_lines = 50
         with isolation.isolate(with_exception) as env:
             pager = isolation.PagerControl(env)
@@ -230,7 +233,7 @@ class InvokePagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(1, env.exit_code())
 
-    def test_stderr_output(self):
+    def test_stderr_output(self) -> None:
         num_lines = 50
         with isolation.isolate(with_stderr_output) as env:
             pager = isolation.PagerControl(env)
@@ -250,7 +253,7 @@ class InvokePagerTest(unittest.TestCase):
 
 
 class NoPagerTest(unittest.TestCase):
-    def test_pipe_output_to_end(self):
+    def test_pipe_output_to_end(self) -> None:
         num_lines = 100
         with isolation.isolate(finite(num_lines),
                                stdout_pipe=True) as env:
@@ -261,7 +264,7 @@ class NoPagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(0, env.exit_code())
 
-    def test_exit_early(self):
+    def test_exit_early(self) -> None:
         with isolation.isolate(infinite, stdout_pipe=True) as env:
             with env.stdout_pipe() as out:
                 for i in range(500):
@@ -269,7 +272,7 @@ class NoPagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(141, env.exit_code())
 
-    def test_exit_early_buffered(self):
+    def test_exit_early_buffered(self) -> None:
         num_lines = 10
         with isolation.isolate(from_stdin,
                                stdin_pipe=True, stdout_pipe=True) as env:
@@ -282,7 +285,7 @@ class NoPagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(141, env.exit_code())
 
-    def test_interrupt_early(self):
+    def test_interrupt_early(self) -> None:
         with isolation.isolate(infinite, stdout_pipe=True) as env:
             env.interrupt()
             with env.stdout_pipe() as out:
@@ -291,7 +294,7 @@ class NoPagerTest(unittest.TestCase):
             self.assertFalse(env.error_output())
         self.assertEqual(130, env.exit_code())
 
-    def test_short_streaming_output(self):
+    def test_short_streaming_output(self) -> None:
         num_lines = 10
         with isolation.isolate(from_stdin,
                                stdin_pipe=True, stdout_pipe=True) as env:

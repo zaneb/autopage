@@ -13,19 +13,21 @@
 import unittest
 import sys
 
-import fixtures
+import fixtures  # type: ignore
+
+import typing
 
 from autopage import command
 
 
 class MoreTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.cmd = command.More()
 
-    def test_cmd(self):
+    def test_cmd(self) -> None:
         self.assertEqual(['more'], self.cmd.command())
 
-    def test_less_env_defaults(self):
+    def test_less_env_defaults(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
@@ -33,152 +35,158 @@ class MoreTest(unittest.TestCase):
 
 
 class LessTest(unittest.TestCase):
-    def setUp(self):
-        self.cmd = command.Less()
+    def setUp(self) -> None:
+        self.cmd: command.PagerCommand = command.Less()
 
-    def test_cmd(self):
+    def _env(self, config: command.PagerConfig) -> typing.Dict:
+        return self.cmd.environment_variables(config) or {}
+
+    def test_cmd(self) -> None:
         self.assertEqual(['less'], self.cmd.command())
 
-    def test_less_env_defaults(self):
+    def test_less_env_defaults(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('RFX', less_env)
 
-    def test_less_env_nocolor(self):
+    def test_less_env_nocolor(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('FX', less_env)
 
-    def test_less_env_reset(self):
+    def test_less_env_reset(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=True)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('R', less_env)
 
-    def test_less_env_nocolor_reset(self):
+    def test_less_env_nocolor_reset(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=False,
                                      reset_terminal=True)
-        self.assertNotIn('LESS', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LESS', self._env(config))
 
-    def test_less_env_linebuffered(self):
+    def test_less_env_linebuffered(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=True,
                                      reset_terminal=False)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('RX', less_env)
 
-    def test_less_env_linebuffered_reset(self):
+    def test_less_env_linebuffered_reset(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=True,
                                      reset_terminal=True)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('R', less_env)
 
-    def test_less_env_linebuffered_nocolor(self):
+    def test_less_env_linebuffered_nocolor(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=True,
                                      reset_terminal=False)
-        less_env = self.cmd.environment_variables(config)['LESS']
+        less_env = self._env(config)['LESS']
         self.assertEqual('X', less_env)
 
-    def test_less_env_linebuffered_nocolor_reset(self):
+    def test_less_env_linebuffered_nocolor_reset(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=True,
                                      reset_terminal=True)
-        self.assertNotIn('LESS', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LESS', self._env(config))
 
-    def test_less_env_override(self):
+    def test_less_env_override(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
         with fixtures.EnvironmentVariable('LESS', 'abc'):
-            env = self.cmd.environment_variables(config) or {}
+            env = self._env(config)
         self.assertNotIn('LESS', env)
 
 
 class LVTest(unittest.TestCase):
-    def setUp(self):
-        self.cmd = command.LV()
+    def setUp(self) -> None:
+        self.cmd: command.PagerCommand = command.LV()
 
-    def test_cmd(self):
+    def _env(self, config: command.PagerConfig) -> typing.Dict:
+        return self.cmd.environment_variables(config) or {}
+
+    def test_cmd(self) -> None:
         self.assertEqual(['lv'], self.cmd.command())
 
-    def test_lv_env_defaults(self):
+    def test_lv_env_defaults(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
-        lv_env = self.cmd.environment_variables(config)['LV']
+        lv_env = self._env(config)['LV']
         self.assertEqual('-c', lv_env)
 
-    def test_lv_env_nocolor(self):
+    def test_lv_env_nocolor(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
-        self.assertNotIn('LV', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LV', self._env(config))
 
-    def test_lv_env_reset(self):
+    def test_lv_env_reset(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=True)
-        lv_env = self.cmd.environment_variables(config)['LV']
+        lv_env = self._env(config)['LV']
         self.assertEqual('-c', lv_env)
 
-    def test_lv_env_nocolor_reset(self):
+    def test_lv_env_nocolor_reset(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=False,
                                      reset_terminal=True)
-        self.assertNotIn('LV', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LV', self._env(config))
 
-    def test_lv_env_linebuffered(self):
+    def test_lv_env_linebuffered(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=True,
                                      reset_terminal=False)
-        lv_env = self.cmd.environment_variables(config)['LV']
+        lv_env = self._env(config)['LV']
         self.assertEqual('-c', lv_env)
 
-    def test_lv_env_linebuffered_reset(self):
+    def test_lv_env_linebuffered_reset(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=True,
                                      reset_terminal=True)
-        lv_env = self.cmd.environment_variables(config)['LV']
+        lv_env = self._env(config)['LV']
         self.assertEqual('-c', lv_env)
 
-    def test_lv_env_linebuffered_nocolor(self):
+    def test_lv_env_linebuffered_nocolor(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=True,
                                      reset_terminal=False)
-        self.assertNotIn('LV', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LV', self._env(config))
 
-    def test_lv_env_linebuffered_nocolor_reset(self):
+    def test_lv_env_linebuffered_nocolor_reset(self) -> None:
         config = command.PagerConfig(color=False,
                                      line_buffering_requested=True,
                                      reset_terminal=True)
-        self.assertNotIn('LV', self.cmd.environment_variables(config) or {})
+        self.assertNotIn('LV', self._env(config))
 
-    def test_lv_env_override(self):
+    def test_lv_env_override(self) -> None:
         config = command.PagerConfig(color=True,
                                      line_buffering_requested=False,
                                      reset_terminal=False)
         with fixtures.EnvironmentVariable('LV', 'abc'):
-            env = self.cmd.environment_variables(config) or {}
+            env = self._env(config)
         self.assertNotIn('LV', env)
 
 
 class DefaultTest(LessTest, LVTest):
-    def setUp(self):
+    def setUp(self) -> None:
         with fixtures.EnvironmentVariable('PAGER', 'less "-r" +F'):
             self.cmd = command.DefaultPager()
 
-    def test_cmd(self):
+    def test_cmd(self) -> None:
         self.assertEqual(['less', '-r', '+F'], self.cmd.command())
 
-    def test_default_cmd(self):
+    def test_default_cmd(self) -> None:
         with fixtures.EnvironmentVariable('PAGER'):
             cmd = command.DefaultPager()
         self.assertEqual(command.PlatformPager().command(),
@@ -186,21 +194,21 @@ class DefaultTest(LessTest, LVTest):
 
 
 class UserSpecifiedTest(DefaultTest):
-    def setUp(self):
+    def setUp(self) -> None:
         with fixtures.EnvironmentVariable('FOO_PAGER', 'less "-r" +F'):
             self.cmd = command.UserSpecifiedPager('FOO_PAGER')
 
-    def test_env_var_priority_cmd(self):
+    def test_env_var_priority_cmd(self) -> None:
         with fixtures.EnvironmentVariable('FOO', 'foo'):
             cmd = command.UserSpecifiedPager('FOO', 'BAR')
         self.assertEqual(['foo'], cmd.command())
 
-    def test_env_var_fallthrough_cmd(self):
+    def test_env_var_fallthrough_cmd(self) -> None:
         with fixtures.EnvironmentVariable('BAR', 'bar'):
             cmd = command.UserSpecifiedPager('FOO', 'BAR')
         self.assertEqual(['bar'], cmd.command())
 
-    def test_default_cmd(self):
+    def test_default_cmd(self) -> None:
         with fixtures.EnvironmentVariable('FOO'):
             with fixtures.EnvironmentVariable('BAR'):
                 cmd = command.UserSpecifiedPager('FOO', 'BAR')
@@ -209,16 +217,16 @@ class UserSpecifiedTest(DefaultTest):
 
 
 class PlatformFixture(fixtures.Fixture):
-    def __init__(self, platform):
+    def __init__(self, platform: str):
         self.platform = platform
 
-    def _setUp(self):
+    def _setUp(self) -> None:
         self.addCleanup(setattr, sys, 'platform', sys.platform)
         sys.platform = self.platform
 
 
 class PlatformTest(unittest.TestCase):
-    def test_aix_cmd(self):
+    def test_aix_cmd(self) -> None:
         with PlatformFixture('aix'):
             cmd = command.PlatformPager()
             self.assertEqual(['more'], cmd.command())
@@ -228,63 +236,63 @@ class PlatformTest(unittest.TestCase):
             cmd = command.PlatformPager()
             self.assertEqual(['more'], cmd.command())
 
-    def test_linux_cmd(self):
+    def test_linux_cmd(self) -> None:
         with PlatformFixture('linux'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
 
-    def test_win32_cmd(self):
+    def test_win32_cmd(self) -> None:
         with PlatformFixture('win32'):
             cmd = command.PlatformPager()
             self.assertEqual(['more.com'], cmd.command())
 
-    def test_cygwin_cmd(self):
+    def test_cygwin_cmd(self) -> None:
         with PlatformFixture('cygwin'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
 
-    def test_macos_cmd(self):
+    def test_macos_cmd(self) -> None:
         with PlatformFixture('darwin'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
 
-    def test_sunos_cmd(self):
+    def test_sunos_cmd(self) -> None:
         with PlatformFixture('sunos5'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
 
-    def test_freebsd_cmd(self):
+    def test_freebsd_cmd(self) -> None:
         with PlatformFixture('freebsd8'):
             cmd = command.PlatformPager()
             self.assertEqual(['less'], cmd.command())
 
 
 class GetPagerCommandTest(unittest.TestCase):
-    def test_instance(self):
+    def test_instance(self) -> None:
         cmd = command.PlatformPager()
         self.assertIs(cmd, command.get_pager_command(cmd))
 
-    def test_subclass(self):
+    def test_subclass(self) -> None:
         cls = command.Less
         self.assertIsInstance(command.get_pager_command(cls), cls)
 
-    def test_func(self):
+    def test_func(self) -> None:
         func = command.PlatformPager
         self.assertIsInstance(command.get_pager_command(func), type(func()))
 
-    def test_string(self):
+    def test_string(self) -> None:
         cmd = command.get_pager_command('foo bar')
         self.assertIsInstance(cmd, command.CustomPager)
         self.assertEqual(['foo', 'bar'], cmd.command())
 
-    def test_list(self):
+    def test_list(self) -> None:
         with fixtures.EnvironmentVariable('FOO', 'foo'):
             cmd = command.get_pager_command(['FOO', 'BAR'])
         self.assertIsInstance(cmd, command.CustomPager)
         self.assertEqual(['foo'], cmd.command())
 
-    def test_int(self):
+    def test_int(self) -> None:
         self.assertRaises(TypeError, command.get_pager_command, 42)
 
-    def test_list_int(self):
+    def test_list_int(self) -> None:
         self.assertRaises(TypeError, command.get_pager_command, ['FOO', 42])

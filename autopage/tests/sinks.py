@@ -17,6 +17,8 @@ import tempfile
 
 import fixtures  # type: ignore
 
+import typing
+
 
 class TTYFixture(fixtures.Fixture):
     def _setUp(self) -> None:
@@ -28,7 +30,7 @@ class TTYFixture(fixtures.Fixture):
 
 class TempFixture(fixtures.Fixture):
     def _setUp(self) -> None:
-        self.stream = tempfile.TemporaryFile('w')
+        self.stream = typing.cast(typing.TextIO, tempfile.TemporaryFile('w'))
 
         def close() -> None:
             try:
@@ -41,5 +43,5 @@ class TempFixture(fixtures.Fixture):
 
 class BufferFixture(fixtures.Fixture):
     def _setUp(self) -> None:
-        self.stream = io.StringIO()
+        self.stream: typing.TextIO = io.StringIO()
         self.addCleanup(self.stream.close)
