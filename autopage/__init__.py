@@ -110,21 +110,20 @@ class AutoPager:
 
         if not isinstance(self._out, io.TextIOWrapper):
             return
-        out = typing.cast(io.TextIOWrapper, self._out)
 
         # Python 3.7 & later
-        if hasattr(out, 'reconfigure'):
-            out.reconfigure(line_buffering=self._set_line_buffering,
-                            errors=(self._set_errors.value
-                                    if self._set_errors is not None
-                                    else None))
+        if hasattr(self._out, 'reconfigure'):
+            self._out.reconfigure(line_buffering=self._set_line_buffering,
+                                  errors=(self._set_errors.value
+                                          if self._set_errors is not None
+                                          else None))
         # Python 3.6
         elif (self._out.line_buffering != self._line_buffering()
                 or self._out.errors != self._errors()):
             # Pure-python I/O
-            if (hasattr(out, '_line_buffering')
-                    and hasattr(out, '_errors')):
-                py_out = typing.cast(Any, out)
+            if (hasattr(self._out, '_line_buffering')
+                    and hasattr(self._out, '_errors')):
+                py_out = typing.cast(Any, self._out)
                 py_out._line_buffering = self._line_buffering()
                 py_out._errors = self._errors()
                 py_out.flush()
@@ -137,7 +136,7 @@ class AutoPager:
                     if self._use_stdout:
                         sys.stdout = typing.cast(TextIO, None)
                     newstream = io.TextIOWrapper(
-                        out.detach(),
+                        self._out.detach(),
                         line_buffering=line_buffering,
                         encoding=encoding,
                         errors=errors)
