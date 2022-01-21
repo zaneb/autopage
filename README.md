@@ -14,7 +14,7 @@ programs can.
 
 ## License
 
-© 2020-2021 by Zane Bitter
+© 2020-2022 by Zane Bitter
 
 Open Source licensed under the terms of the Apache Software License, version
 2.0.
@@ -29,20 +29,38 @@ with `pip`:
 
 ### On Fedora and CentOS/RHEL
 
-Copr repositories are available for Fedora and EPEL. The library can be
-installed by first enabling the repository:
+Autopage is [packaged for
+Fedora](https://packages.fedoraproject.org/pkgs/python-autopage/python3-autopage/)
+35 and later. To install:
 
-    # dnf copr enable zaneb/autopage
     # dnf install python3-autopage
 
-### On Ubuntu
+Copr repositories are available for older versions of Fedora and EPEL. Before
+attempting to install on those versions, first enable the copr repository:
 
-A PPA is available for Ubuntu. The library can be installed by first enabling
-the PPA:
+    # dnf copr enable zaneb/autopage
+
+### On Ubuntu and Debian
+
+Autopage is [packaged for
+Ubuntu](https://packages.ubuntu.com/search?keywords=python3-autopage&searchon=names)
+jammy and later, and [for Debian](https://packages.debian.org/python3-autopage)
+bookworm. To install:
+
+    # apt-get install python3-autopage
+
+A PPA is available for older versions of Ubuntu. Before attempting to install
+on those versions, first enable the PPA:
 
     # add-apt-repository ppa:zaneb/autopage
     # apt-get update
-    # apt-get install python3-autopage
+
+### On Gentoo
+
+Autopage is [packaged for
+Gentoo](https://packages.gentoo.org/packages/dev-python/autopage). To install:
+
+    # emerge dev-python/autopage
 
 ## Basic Use
 
