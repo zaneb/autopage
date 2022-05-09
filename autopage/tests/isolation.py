@@ -84,7 +84,7 @@ class IsolationEnvironment:
         return os.fdopen(self._stdin_fifo_fd, 'w', closefd=False)
 
     def close(self, get_return_code: typing.Callable[[], int]) -> None:
-        for i in range(50):
+        for i in range(100):
             if os.waitpid(self._pid, os.WNOHANG) != (0, 0):
                 break
             time.sleep(0.001)
