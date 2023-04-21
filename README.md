@@ -101,7 +101,7 @@ The default pager command (`autopage.command.DefaultPager()`) allows the end
 user to override the pager command by setting the `PAGER` environment variable.
 To disable this behaviour, pass
 `pager_command=autopage.command.PlatformPager()` to use the default pager for
-the current platform, or pass a specific pager from `autopage.commands`. The
+the current platform, or pass a specific pager from `autopage.command`. The
 default pager command is `less` on most platforms. On AIX the default pager
 command is `more`, and on Windows `more.com`.
 
@@ -138,9 +138,9 @@ for a given input stream (`sys.stdin` by default).
 import sys
 import autopage
 
-with autopage.AutoPager(line_buffering=line_buffer_from_input()) as out:
+with autopage.AutoPager(line_buffering=autopage.line_buffer_from_input()) as o:
     for l in sys.stdin:
-        out.write(l)
+        o.write(l)
 ```
 
 ## Terminal reset
