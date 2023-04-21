@@ -224,7 +224,7 @@ class AutoPager:
                 return True
             elif isinstance(exc, KeyboardInterrupt):
                 self._exit_code = _signal_exit_code(signal.SIGINT)
-            elif isinstance(exc, SystemExit):
+            elif isinstance(exc, SystemExit) and isinstance(exc.code, int):
                 self._exit_code = exc.code
             else:
                 self._exit_code = 1
