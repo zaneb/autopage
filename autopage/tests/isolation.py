@@ -215,7 +215,7 @@ def isolate(child_function: typing.Callable[[], int],
                 p.start()
 
                 def handle_terminate(signum: int,
-                                     frame: types.FrameType) -> None:
+                                     frame: Optional[types.FrameType]) -> None:
                     if p.is_alive():
                         p.terminate()
 
