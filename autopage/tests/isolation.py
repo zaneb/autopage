@@ -190,6 +190,11 @@ class TestProcessNotComplete(Exception):
     pass
 
 
+class TimeoutException(Exception):
+    def __init__(self, pid: Optional[int]):
+        super(Exception, self).__init__(f'Test process {pid} timed out')
+
+
 @contextlib.contextmanager
 def isolate(child_function: typing.Callable[[], int],
             stdin_pipe: bool = False,
@@ -226,14 +231,18 @@ def isolate(child_function: typing.Callable[[], int],
                 signal.signal(signal.SIGINT, signal.SIG_IGN)
 
                 p.join(2)  # Wait at most 2s
+                if p.exitcode is None:
+                    raise TimeoutException(p.pid)
             except BaseException:
-                with os.fdopen(result_w, 'w') as result_writer:
-                    traceback.print_exc(file=result_writer)
-                # Prevent blocking in parent process by opening our end of all
-                # FIFOs.
-                for path, write in zip(fifo_paths, [False, True, True]):
-                    _open_fifo(path, write)
-                os._exit(1)
+                try:
+                    with os.fdopen(result_w, 'w') as result_writer:
+                        traceback.print_exc(file=result_writer)
+                finally:
+                    # Prevent blocking in parent process by opening our end of
+                    # all FIFOs.
+                    for path, write in zip(fifo_paths, [False, True, True]):
+                        _open_fifo(path, write)
+                    os._exit(1)
             with os.fdopen(result_w, 'w') as result_writer:
                 result_writer.write(f'{p.exitcode}\n')
 
