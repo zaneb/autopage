@@ -204,7 +204,7 @@ def isolate(child_function: typing.Callable[[], int],
                 'stderr' if stderr_pipe else None) as fifo_paths:
         result_r, result_w = os.pipe()
         env_pid, tty = pty.fork()
-        if env_pid == 0:
+        if env_pid == pty.CHILD:
             try:
                 os.close(result_r)
                 # Get ttyname from original stdout, even if test runner has
