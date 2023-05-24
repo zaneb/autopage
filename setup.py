@@ -1,3 +1,4 @@
 from setuptools import setup
 
-setup(install_requires=["setuptools>=30.3.0"])
+if __name__ == '__main__':
+    setup(install_requires=["setuptools>=30.3.0"])
