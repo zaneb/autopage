@@ -207,7 +207,9 @@ def isolate(child_function: typing.Callable[[], int],
         if env_pid == 0:
             try:
                 os.close(result_r)
-                pts = os.ttyname(sys.stdout.fileno())
+                # Get ttyname from original stdout, even if test runner has
+                # replaced stdout with another file
+                pts = os.ttyname(pty.STDOUT_FILENO)
 
                 ctx = multiprocessing.get_context('spawn')
                 p = ctx.Process(target=_run_test, args=(child_function, pts,
