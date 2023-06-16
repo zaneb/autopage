@@ -289,6 +289,17 @@ class ExitCodeTest(fixtures.TestWithFixtures):
         self.assertRaises(MyException, run)
         self.assertEqual(1, self.ap.exit_code())
 
+    def test_exception_on_error_default(self) -> None:
+        class MyException(Exception):
+            pass
+
+        def run() -> None:
+            with self.ap:
+                raise MyException
+
+        self.assertRaises(MyException, run)
+        self.assertEqual(2, self.ap.exit_code(on_error_default=2))
+
     def test_base_exception(self) -> None:
         class MyBaseException(BaseException):
             pass
@@ -315,6 +326,30 @@ class ExitCodeTest(fixtures.TestWithFixtures):
 
         self.assertRaises(SystemExit, run)
         self.assertEqual(42, self.ap.exit_code())
+
+    def test_system_exit_on_error_default(self) -> None:
+        def run() -> None:
+            with self.ap:
+                raise SystemExit(42)
+
+        self.assertRaises(SystemExit, run)
+        self.assertEqual(42, self.ap.exit_code(on_error_default=3))
+
+    def test_system_exit_string(self) -> None:
+        def run() -> None:
+            with self.ap:
+                raise SystemExit("nope")
+
+        self.assertRaises(SystemExit, run)
+        self.assertEqual(1, self.ap.exit_code())
+
+    def test_system_exit_string_on_error_default(self) -> None:
+        def run() -> None:
+            with self.ap:
+                raise SystemExit("nope")
+
+        self.assertRaises(SystemExit, run)
+        self.assertEqual(3, self.ap.exit_code(on_error_default=3))
 
 
 class CleanupTest(unittest.TestCase):

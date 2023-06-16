@@ -75,7 +75,7 @@ class AutoPager:
         self._set_errors = (ErrorStrategy(errors) if errors is not None
                             else None)
         self._pager: Optional[subprocess.Popen] = None
-        self._exit_code = 0
+        self._exit_code: typing.Union[int, BaseException] = 0
 
     def to_terminal(self) -> bool:
         """Return whether the output stream is a terminal."""
@@ -233,10 +233,10 @@ class AutoPager:
             elif isinstance(exc, SystemExit) and isinstance(exc.code, int):
                 self._exit_code = exc.code
             else:
-                self._exit_code = 1
+                self._exit_code = exc
         return False
 
-    def exit_code(self) -> int:
+    def exit_code(self, *, on_error_default: int = 1) -> int:
         """
         Return an appropriate exit code for the process based on any errors.
 
@@ -245,6 +245,8 @@ class AutoPager:
         returns an appropriate exit code on the basis of the existence and type
         of any uncaught exceptions.
         """
+        if not isinstance(self._exit_code, int):
+            return on_error_default
         return self._exit_code
 
 
