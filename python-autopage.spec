@@ -27,7 +27,7 @@ BuildRequires:  pyproject-rpm-macros
 %autosetup -n %{srcname}-%{version}
 
 %generate_buildrequires
-%pyproject_buildrequires -e pep8,%{toxenv}
+%pyproject_buildrequires -t
 
 %build
 %pyproject_wheel
