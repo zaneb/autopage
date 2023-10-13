@@ -26,7 +26,7 @@ import time
 import traceback
 
 import types
-from typing import Optional, Generator
+from typing import Optional, Generator, Tuple
 import typing
 
 
@@ -128,6 +128,25 @@ class PagerControl:
 
     def _iter_lines(self) -> Generator[typing.Union[str, None],
                                        None, None]:
+        def get_content(segment: str) -> Tuple[bool,
+                                               typing.Union[str, None]]:
+            if not segment:
+                return False, ''
+            if segment == '\x1b[1m~\x1b[0m\n':
+                # Ignore lines that are filling blank vertical space with
+                # '~' after hitting Ctrl-C when the screen is not full
+                return False, ''
+            visible = self._ctrl_chars.sub('', segment)
+            if ((visible.rstrip() == ':' or '(END)' in visible
+                    or 'Waiting for data...' in visible)
+                    and segment.replace('\x1b[m', '') != visible):
+                return True, self._page_end
+            elif visible.rstrip() or segment == visible:
+                self._total_lines += 1
+                self.env.record_output(visible)
+                return True, visible
+            return False, ''
+
         while True:
             line = '\x1b[?'
             while line.lstrip(' q').startswith('\x1b[?'):
@@ -135,19 +154,15 @@ class PagerControl:
                 line = (rawline.replace('\x07', '')     # Ignore bell
                                .replace('\x1b[m', ''))  # Ignore style reset
             before, reset, after = line.partition('\x1b[2J')
-            for segment in filter(bool, (before, after)):
-                if segment == '\x1b[1m~\x1b[0m\n':
-                    # Ignore lines that are filling blank vertical space with
-                    # '~' after hitting Ctrl-C when the screen is not full
-                    continue
-                visible = self._ctrl_chars.sub('', segment)
-                if ((visible.rstrip() == ':' or '(END)' in visible)
-                        and segment.replace('\x1b[m', '') != visible):
-                    yield self._page_end
-                elif visible != '\n' or segment == visible:
-                    self._total_lines += 1
-                    self.env.record_output(visible)
-                    yield visible
+
+            valid, content = get_content(before)
+            if valid:
+                yield content
+            if reset and not (valid and (content is self._page_end)):
+                yield self._page_end
+            valid, content = get_content(after)
+            if valid:
+                yield content
 
     def read_lines(self, count: int) -> typing.Iterator[str]:
         return itertools.islice((line for line in self._lines
