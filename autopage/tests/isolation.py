@@ -56,6 +56,9 @@ class IsolationEnvironment:
 
         self._exit_code: Optional[int] = None
 
+        self._raw_lines: typing.List[str] = []
+        self._lines: typing.List[str] = []
+
     def interrupt(self) -> None:
         self.write(b'\x03')
         time.sleep(0.001)
@@ -64,7 +67,9 @@ class IsolationEnvironment:
         os.write(self._ptm_fd, data)
 
     def readline(self) -> str:
-        return self._tty.readline()
+        line = self._tty.readline()
+        self._raw_lines.append(line)
+        return line
 
     def error_output(self) -> str:
         if self._stderr_fifo_fd is None:
@@ -103,6 +108,13 @@ class IsolationEnvironment:
         assert self._exit_code is not None
         return self._exit_code
 
+    def record_output(self, line: str) -> None:
+        self._lines.append(line)
+
+    def recorded_output(self) -> typing.Tuple[typing.List[str],
+                                              typing.List[str]]:
+        return self._raw_lines[:], self._lines[:]
+
 
 class PagerControl:
     _page_end = None
@@ -134,6 +146,7 @@ class PagerControl:
                     yield self._page_end
                 elif visible != '\n' or segment == visible:
                     self._total_lines += 1
+                    self.env.record_output(visible)
                     yield visible
 
     def read_lines(self, count: int) -> typing.Iterator[str]:
@@ -254,20 +267,29 @@ def isolate(child_function: typing.Callable[[], int],
             env = IsolationEnvironment(env_pid, tty, *fifo_paths)
             time.sleep(0.01)
             try:
-                yield env
-            finally:
-                def get_return_code() -> int:
-                    with os.fdopen(result_r) as result_reader:
-                        result = result_reader.readline().rstrip()
-                        try:
-                            return int(result)
-                        except ValueError:
-                            pass
-                        trace = result_reader.read()
-                        raise TestProcessNotComplete('\n'.join([result,
-                                                                trace]))
+                try:
+                    yield env
+                finally:
+                    def get_return_code() -> int:
+                        with os.fdopen(result_r) as result_reader:
+                            result = result_reader.readline().rstrip()
+                            try:
+                                return int(result)
+                            except ValueError:
+                                pass
+                            trace = result_reader.read()
+                            raise TestProcessNotComplete('\n'.join([result,
+                                                                    trace]))
 
-                env.close(get_return_code)
+                    env.close(get_return_code)
+            except Exception:
+                raw, processed = env.recorded_output()
+                if raw:
+                    print(f'Raw output: {repr(raw)}', file=sys.stderr)
+                if processed:
+                    print(f'Recorded output: {repr(processed)}',
+                          file=sys.stderr)
+                raise
 
 
 def _run_test(test_function: typing.Callable[[], int],
