@@ -263,7 +263,8 @@ def line_buffer_from_input(input_stream: Optional[typing.IO] = None) -> bool:
     """
     if input_stream is None:
         input_stream = sys.stdin
-    return not input_stream.seekable()
+    # On Illumos, TTYs claim to be seekable so don't believe them
+    return not (input_stream.seekable() and not input_stream.isatty())
 
 
 def _signal_exit_code(signum: signal.Signals) -> int:
