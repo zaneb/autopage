@@ -14,7 +14,7 @@ programs can.
 
 ## License
 
-© 2020-2022 by Zane Bitter
+© 2020-2023 by Zane Bitter
 
 Open Source licensed under the terms of the Apache Software License, version
 2.0.
