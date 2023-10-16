@@ -31,7 +31,7 @@ with `pip`:
 
 Autopage is [packaged for
 Fedora](https://packages.fedoraproject.org/pkgs/python-autopage/python3-autopage/)
-35 and later. To install:
+35 and later, and EPEL 9. To install:
 
     # dnf install python3-autopage
 
