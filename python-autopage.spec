@@ -16,7 +16,7 @@
 
 
 Name:           python-%{srcname}
-Version:        0.5.1
+Version:        0.5.2
 Release:        1%{?dist}
 Summary:        A Python library to provide automatic paging for console output
 License:        ASL 2.0
@@ -50,7 +50,7 @@ BuildRequires:  %{py3_dist fixtures}
 
 %if %{with pyproject}
 %generate_buildrequires
-%pyproject_buildrequires -e pep8,%{toxenv}
+%pyproject_buildrequires -t
 %else
 cp %{SOURCE1} ./
 %endif
@@ -90,6 +90,12 @@ cp %{SOURCE1} ./
 %doc README.md
 
 %changelog
+* Mon Oct 16 2023 Zane Bitter <zaneb@fedoraproject.org> 0.5.2-1
+- Fix tests with less v633
+- Fix test reliability
+- Fix build dependencies with latest fixtures
+- Simplify pytest invocation
+
 * Fri May 27 2022 Zane Bitter <zaneb@fedoraproject.org> 0.5.1-1
 - Update to v0.5.1 to fix test reliability
 
