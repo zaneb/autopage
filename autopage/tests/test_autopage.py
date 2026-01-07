@@ -10,6 +10,7 @@
 #   License for the specific language governing permissions and limitations
 #   under the License.
 
+import codecs
 import subprocess
 import sys
 import unittest
@@ -58,7 +59,7 @@ class PagedStreamTest(fixtures.TestWithFixtures):
                 env=get_env.return_value,
                 bufsize=-1,
                 universal_newlines=True,
-                encoding='UTF-8',
+                encoding='utf-8',
                 errors='strict',
                 stdin=subprocess.PIPE,
                 stdout=None)
@@ -84,7 +85,7 @@ class PagedStreamTest(fixtures.TestWithFixtures):
                     env=get_env.return_value,
                     bufsize=-1,
                     universal_newlines=True,
-                    encoding='UTF-8',
+                    encoding='utf-8',
                     errors='strict',
                     stdin=subprocess.PIPE,
                     stdout=None)
@@ -100,7 +101,7 @@ class PagedStreamTest(fixtures.TestWithFixtures):
                 env=get_env.return_value,
                 bufsize=-1,
                 universal_newlines=True,
-                encoding='UTF-8',
+                encoding='utf-8',
                 errors='strict',
                 stdin=subprocess.PIPE,
                 stdout=None)
@@ -412,7 +413,7 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.stream = out.stream
         self.default_lb = self.stream.line_buffering
         self.default_errors = self.stream.errors
-        self.encoding = self.stream.encoding
+        self.encoding = codecs.lookup(self.stream.encoding).name
 
     def test_line_buffering_on(self) -> None:
         ap = autopage.AutoPager(self.stream, line_buffering=True)
@@ -420,7 +421,7 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.addCleanup(ap._out.close)
         self.assertTrue(ap._out.line_buffering)
         self.assertEqual(self.default_errors, ap._out.errors)
-        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual(self.encoding, ap._encoding())
         self.assertIs(True, ap._line_buffering())
         self.assertEqual(self.default_errors, ap._errors())
 
@@ -430,7 +431,7 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.addCleanup(ap._out.close)
         self.assertFalse(ap._out.line_buffering)
         self.assertEqual(self.default_errors, ap._out.errors)
-        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual(self.encoding, ap._encoding())
         self.assertIs(False, ap._line_buffering())
         self.assertEqual(self.default_errors, ap._errors())
 
@@ -441,7 +442,8 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
             self.addCleanup(ap._out.close)
             self.assertTrue(sys.stdout.line_buffering)
             self.assertEqual(self.default_errors, sys.stdout.errors)
-            self.assertEqual(self.encoding, sys.stdout.encoding)
+            self.assertEqual(self.encoding,
+                             codecs.lookup(sys.stdout.encoding).name)
 
     def test_errors(self) -> None:
         ap = autopage.AutoPager(self.stream,
@@ -451,7 +453,7 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.assertEqual(self.default_lb, ap._out.line_buffering)
         self.assertEqual('namereplace', ap._out.errors)
         self.assertNotEqual(self.default_errors, ap._out.errors)
-        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual(self.encoding, ap._encoding())
         self.assertEqual('namereplace', ap._errors())
         self.assertEqual(self.default_lb, ap._line_buffering())
 
@@ -463,7 +465,7 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.assertEqual(self.default_lb, ap._out.line_buffering)
         self.assertEqual('namereplace', ap._out.errors)
         self.assertNotEqual(self.default_errors, ap._out.errors)
-        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual(self.encoding, ap._encoding())
         self.assertEqual('namereplace', ap._errors())
         self.assertEqual(self.default_lb, ap._line_buffering())
 
@@ -481,6 +483,6 @@ class StreamConfigureTest(fixtures.TestWithFixtures):
         self.assertTrue(ap._out.line_buffering)
         self.assertEqual('namereplace', ap._out.errors)
         self.assertNotEqual(self.default_errors, ap._out.errors)
-        self.assertEqual(self.encoding, ap._out.encoding)
+        self.assertEqual(self.encoding, ap._encoding())
         self.assertIs(True, ap._line_buffering())
         self.assertEqual('namereplace', ap._errors())

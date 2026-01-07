@@ -16,6 +16,7 @@ A library to provide automatic paging for console output.
 By Zane Bitter.
 """
 
+import codecs
 import contextlib
 import enum
 import io
@@ -97,7 +98,12 @@ class AutoPager:
         return self._set_line_buffering
 
     def _encoding(self) -> str:
-        return getattr(self._out, 'encoding', 'ascii')
+        dflt = 'utf-8' if getattr(sys.flags, 'utf8_mode', False) else 'ascii'
+        encoding = getattr(self._out, 'encoding', dflt)
+        try:
+            return codecs.lookup(encoding).name
+        except LookupError:
+            return dflt
 
     def _errors(self) -> str:
         if self._set_errors is None:
