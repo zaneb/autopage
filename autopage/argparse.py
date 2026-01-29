@@ -33,6 +33,7 @@ restored.
 import argparse
 import contextlib
 import functools
+import os
 import sys
 import types
 from typing import Any, Sequence, Text, TextIO, Tuple, Type, Optional, Union
@@ -59,6 +60,19 @@ def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
 def use_color_for_parser(parser: argparse.ArgumentParser,
                          color: bool) -> None:
     """Configure a parser whether to output in color from HelpFormatters."""
+    if os.getenv('FORCE_COLOR') is None:
+        if (os.getenv('NO_COLOR') is not None or
+            os.getenv('TERM') == 'dumb' or
+            (not sys.flags.ignore_environment and
+             os.getenv('PYTHON_COLORS') == '0')):
+            color = False
+        elif sys.platform == 'win32':
+            try:
+                import nt
+                if not nt._supports_virtual_terminal():
+                    color = False
+            except (ImportError, AttributeError):
+                color = False
     parser.color = color
 
 
