@@ -33,6 +33,7 @@ restored.
 import argparse
 import contextlib
 import functools
+import sys
 import types
 from typing import Any, Sequence, Text, TextIO, Tuple, Type, Optional, Union
 from typing import Callable, ContextManager, Generator
@@ -58,7 +59,7 @@ def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
 def use_color_for_parser(parser: argparse.ArgumentParser,
                          color: bool) -> None:
     """Configure a parser whether to output in color from HelpFormatters."""
-    setattr(parser, _color_attr, color)
+    parser.color = color
 
 
 class ColorHelpFormatter(_HelpFormatter):
@@ -129,7 +130,8 @@ class _HelpAction(argparse._HelpAction):
                  option_string: Optional[Text] = None) -> None:
         pager = help_pager()
         with pager as out:
-            use_color_for_parser(parser, pager.to_terminal())
+            use_color_for_parser(parser, (pager.to_terminal() and
+                                          getattr(parser, 'color', True)))
             parser.print_help(out)
         parser.exit(pager.exit_code())
 
@@ -154,7 +156,7 @@ def _substitute_formatter(
         formatter = get_fmtr(parser, **kwargs)
         if isinstance(formatter, ColorHelpFormatter):
             setattr(formatter, _color_attr,
-                    getattr(parser, _color_attr, False))
+                    getattr(parser, 'color', False))
         return formatter
     return _get_formatter
 
