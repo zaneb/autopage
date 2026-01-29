@@ -144,10 +144,14 @@ def _substitute_formatter(
             get_fmtr: Callable[[Any], _HelpFormatter]
         ) -> Callable[[argparse.ArgumentParser], _HelpFormatter]:
     @functools.wraps(get_fmtr)
-    def _get_formatter(parser: argparse.ArgumentParser) -> _HelpFormatter:
+    def _get_formatter(parser: argparse.ArgumentParser,
+                       file: Optional[TextIO] = None) -> _HelpFormatter:
         if parser.formatter_class is _HelpFormatter:
             parser.formatter_class = ColorHelpFormatter
-        formatter = get_fmtr(parser)
+        kwargs = {}
+        if file is not None:
+            kwargs['file'] = file
+        formatter = get_fmtr(parser, **kwargs)
         if isinstance(formatter, ColorHelpFormatter):
             setattr(formatter, _color_attr,
                     getattr(parser, _color_attr, False))
@@ -157,8 +161,11 @@ def _substitute_formatter(
 
 class AutoPageArgumentParser(argparse.ArgumentParser, _ActionsContainer):
     @_substitute_formatter
-    def _get_formatter(self) -> _HelpFormatter:
-        return super()._get_formatter()
+    def _get_formatter(self, file: Optional[TextIO] = None) -> _HelpFormatter:
+        kwargs = {}
+        if file is not None:
+            kwargs['file'] = file
+        return super()._get_formatter(**kwargs)
 
 
 ArgumentParser = AutoPageArgumentParser                         # type: ignore
