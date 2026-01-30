@@ -166,7 +166,7 @@ def _substitute_formatter(
     def _get_formatter(parser: argparse.ArgumentParser,
                        file: Optional[TextIO] = None) -> _HelpFormatter:
         if parser.formatter_class is _HelpFormatter:
-            parser.formatter_class = ColorHelpFormatter
+            parser.formatter_class = HelpFormatter
         kwargs = {}
         if file is not None:
             kwargs['file'] = getattr(file, _original_stream_attr, file)
@@ -187,12 +187,17 @@ class AutoPageArgumentParser(argparse.ArgumentParser, _ActionsContainer):
         return super()._get_formatter(**kwargs)
 
 
-ArgumentParser = AutoPageArgumentParser                         # type: ignore
-HelpFormatter = ColorHelpFormatter                              # type: ignore
-RawDescriptionHelpFormatter = ColorRawDescriptionHelpFormatter  # type: ignore
-RawTextHelpFormatter = ColorRawTextHelpFormatter                # type: ignore
-ArgumentDefaultsHelpFormatter = ColorArgDefaultsHelpFormatter   # type: ignore
-MetavarTypeHelpFormatter = ColorMetavarTypeHelpFormatter        # type: ignore
+ArgumentParser = AutoPageArgumentParser   # type: ignore
+if sys.version_info < (3, 14):
+    HelpFormatter = ColorHelpFormatter    # type: ignore
+    RawDescriptionHelpFormatter = \
+        ColorRawDescriptionHelpFormatter  # type: ignore
+    RawTextHelpFormatter = \
+        ColorRawTextHelpFormatter         # type: ignore
+    ArgumentDefaultsHelpFormatter = \
+        ColorArgDefaultsHelpFormatter     # type: ignore
+    MetavarTypeHelpFormatter = \
+        ColorMetavarTypeHelpFormatter     # type: ignore
 
 
 def monkey_patch() -> ContextManager:

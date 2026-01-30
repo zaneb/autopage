@@ -22,6 +22,7 @@ import autopage.argparse
 
 class ArgumentParseTest(fixtures.TestWithFixtures):
     def setUp(self) -> None:
+        self.useFixture(fixtures.EnvironmentVariable('PYTHON_COLORS', '1'))
         patch_ap = self.useFixture(fixtures.MockPatch('autopage.AutoPager'))
         self.pager = patch_ap.mock
         self.stream = self.useFixture(fixtures.StringStream('stdout')).stream
@@ -43,7 +44,8 @@ class ArgumentParseTest(fixtures.TestWithFixtures):
                                            reset_on_exit=False)
         self.pager.return_value.__enter__.assert_called_once()
         self.stream.seek(0)
-        self.assertEqual('\033' in self.stream.read(), color)
+        output = self.stream.read()
+        self.assertEqual(any(c in output for c in ('\033', '\x1b')), color)
 
     def test_argparse_no_color(self) -> None:
         self.test_argparse(color=False)
