@@ -1,7 +1,7 @@
 %global srcname autopage
 
 Name:           python-%{srcname}
-Version:        0.5.2
+Version:        0.6.0
 Release:        1%{?dist}
 Summary:        A Python library to provide automatic paging for console output
 License:        ASL 2.0
@@ -44,6 +44,12 @@ BuildRequires:  pyproject-rpm-macros
 %doc README.md
 
 %changelog
+* Fri Jan 30 2026 Zane Bitter <zaneb@fedoraproject.org> 0.6.0-1
+- Fix compatibility with Python 3.15.0a2
+- Comply with PEP540 UTF-8 Mode
+- Defer to stdlib for argparse coloring in Python 3.14 and later
+- Add feature to specify a default error code
+
 * Mon Oct 16 2023 Zane Bitter <zaneb@fedoraproject.org> 0.5.2-1
 - Fix tests with less v633
 - Fix test reliability
