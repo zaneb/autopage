@@ -47,6 +47,7 @@ from argparse import *  # noqa
 _HelpFormatter = argparse.HelpFormatter
 
 _color_attr = '_autopage_color'
+_original_stream_attr = '_autopage_original_stream'
 
 
 def help_pager(out_stream: Optional[TextIO] = None) -> autopage.AutoPager:
@@ -144,6 +145,8 @@ class _HelpAction(argparse._HelpAction):
                  option_string: Optional[Text] = None) -> None:
         pager = help_pager()
         with pager as out:
+            if out is not pager._out:
+                setattr(out, _original_stream_attr, pager._out)
             use_color_for_parser(parser, (pager.to_terminal() and
                                           getattr(parser, 'color', True)))
             parser.print_help(out)
@@ -166,7 +169,7 @@ def _substitute_formatter(
             parser.formatter_class = ColorHelpFormatter
         kwargs = {}
         if file is not None:
-            kwargs['file'] = file
+            kwargs['file'] = getattr(file, _original_stream_attr, file)
         formatter = get_fmtr(parser, **kwargs)
         if isinstance(formatter, ColorHelpFormatter):
             setattr(formatter, _color_attr,
